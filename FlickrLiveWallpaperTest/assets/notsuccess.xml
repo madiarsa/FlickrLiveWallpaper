@@ -1,0 +1,3 @@
+<rsp stat="fail">
+	<err code="100" msg="Invalid API Key (Key has invalid format)"/>
+</rsp>

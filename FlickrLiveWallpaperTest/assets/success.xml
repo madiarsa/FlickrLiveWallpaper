@@ -1,0 +1,29 @@
+<rsp
+	stat="ok">
+	<photos
+		page="1"
+		pages="2"
+		perpage="2"
+		total="4">
+		<photo
+			id="4341987094"
+			owner="41073876@N00"
+			secret="7528f197ac"
+			server="4001"
+			farm="5"
+			title="IMG_8610"
+			ispublic="1"
+			isfriend="0"
+			isfamily="0" />
+		<photo
+			id="4341351489"
+			owner="10272375@N00"
+			secret="0831361747"
+			server="2784"
+			farm="3"
+			title="white house lawn"
+			ispublic="1"
+			isfriend="0"
+			isfamily="0" />
+	</photos>
+</rsp>
