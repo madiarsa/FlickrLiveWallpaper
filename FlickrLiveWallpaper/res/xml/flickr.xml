@@ -1,3 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- icon from http://www.blogperfume.com/social-media-icons-pack-in-3-sizes-for-download/ under CC license -->
 <wallpaper
-	xmlns:android="http://schemas.android.com/apk/res/android" />
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	android:author="@string/author"
+	android:thumbnail="@drawable/flickr"
+	android:description="@string/description" />

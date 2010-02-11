@@ -9,6 +9,7 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.util.Log;
 import android.util.Pair;
 
 @SuppressWarnings("unchecked")
@@ -63,6 +64,7 @@ public abstract class Flickr<T> {
 					p.second.toString()).append('&');
 		}
 		builder.deleteCharAt(builder.length() - 1);
+		Log.i("Flickr", "will call " + builder.toString());
 		return builder.toString();
 	}
 }

@@ -12,6 +12,7 @@ import org.xmlpull.v1.XmlPullParserFactory;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.util.Log;
 
 /*
  * Represents a single photo taken from the photo search method:
@@ -28,6 +29,9 @@ public class Photo {
 	private boolean isPublic;
 	private boolean isFriend;
 	private boolean isFamily;
+	private String url_o;
+	private int height_o;
+	private int width_o;
 
 	private final String URL_FORMAT = "http://farm%d.static.flickr.com/%d/%d_%s.jpg";
 
@@ -49,10 +53,15 @@ public class Photo {
 	}
 
 	public String getPhotoURL() {
-		return String.format(URL_FORMAT, farm, server, id, secret);
+		if (url_o != null && !url_o.equals("")) {
+			return url_o;
+		} else {
+			return String.format(URL_FORMAT, farm, server, id, secret);
+		}
 	}
-	
+
 	public Bitmap getPhoto() throws IOException {
+		Log.i("Flickr", getPhotoURL() );
 		URLConnection connection = null;
 		connection = new URL(getPhotoURL()).openConnection();
 		BufferedInputStream bin = new BufferedInputStream(connection
@@ -101,6 +110,13 @@ public class Photo {
 					photo.setServer(new Integer(xpp.getAttributeValue(null,
 							"server")));
 					photo.setTitle(xpp.getAttributeValue(null, "title"));
+
+					//
+					photo.setUrl_o(xpp.getAttributeValue(null, "url_o"));
+					photo.setHeight_o(new Integer(xpp.getAttributeValue(null,
+							"height_o")));
+					photo.setWidth_o(new Integer(xpp.getAttributeValue(null,
+							"width_o")));
 				}
 				eventType = xpp.next();
 			}
@@ -108,6 +124,8 @@ public class Photo {
 			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
+		} catch (NumberFormatException e) {
+			// bail;
 		}
 		return photo;
 	}
@@ -116,19 +134,31 @@ public class Photo {
 	// TODO make it DRY
 	public static Photo fromXPP(XmlPullParser xpp) {
 		Photo photo = new Photo();
-		int isFamily = new Integer(xpp.getAttributeValue(null, "isfamily"));
-		int isFriend = new Integer(xpp.getAttributeValue(null, "isfriend"));
-		int isPublic = new Integer(xpp.getAttributeValue(null, "ispublic"));
+		try {
+			int isFamily = new Integer(xpp.getAttributeValue(null, "isfamily"));
+			int isFriend = new Integer(xpp.getAttributeValue(null, "isfriend"));
+			int isPublic = new Integer(xpp.getAttributeValue(null, "ispublic"));
 
-		photo.setId(new Long(xpp.getAttributeValue(null, "id")));
-		photo.setFamily((isFamily == 0) ? false : true);
-		photo.setFarm(new Integer(xpp.getAttributeValue(null, "farm")));
-		photo.setFriend((isFriend == 0) ? false : true);
-		photo.setOwner(xpp.getAttributeValue(null, "owner"));
-		photo.setPublic((isPublic == 0) ? false : true);
-		photo.setSecret(xpp.getAttributeValue(null, "secret"));
-		photo.setServer(new Integer(xpp.getAttributeValue(null, "server")));
-		photo.setTitle(xpp.getAttributeValue(null, "title"));
+			photo.setId(new Long(xpp.getAttributeValue(null, "id")));
+			photo.setFamily((isFamily == 0) ? false : true);
+			photo.setFarm(new Integer(xpp.getAttributeValue(null, "farm")));
+			photo.setFriend((isFriend == 0) ? false : true);
+			photo.setOwner(xpp.getAttributeValue(null, "owner"));
+			photo.setPublic((isPublic == 0) ? false : true);
+			photo.setSecret(xpp.getAttributeValue(null, "secret"));
+			photo.setServer(new Integer(xpp.getAttributeValue(null, "server")));
+			photo.setTitle(xpp.getAttributeValue(null, "title"));
+
+			//
+			photo.setUrl_o(xpp.getAttributeValue(null, "url_o"));
+			photo.setHeight_o(new Integer(xpp.getAttributeValue(null,
+					"height_o")));
+			photo
+					.setWidth_o(new Integer(xpp.getAttributeValue(null,
+							"width_o")));
+		} catch (NumberFormatException e) {
+			// bail
+		}
 		return photo;
 	}
 
@@ -204,5 +234,29 @@ public class Photo {
 
 	public void setFamily(boolean isFamily) {
 		this.isFamily = isFamily;
+	}
+
+	public String getUrl_o() {
+		return url_o;
+	}
+
+	public void setUrl_o(String urlO) {
+		url_o = urlO;
+	}
+
+	public int getHeight_o() {
+		return height_o;
+	}
+
+	public void setHeight_o(int heightO) {
+		height_o = heightO;
+	}
+
+	public int getWidth_o() {
+		return width_o;
+	}
+
+	public void setWidth_o(int widthO) {
+		width_o = widthO;
 	}
 }

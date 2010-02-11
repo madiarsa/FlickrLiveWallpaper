@@ -7,11 +7,13 @@
 
 	<uses-permission
 		android:name="android.permission.INTERNET" />
-
+	<uses-permission
+		android:name="android.permission.ACCESS_COARSE_LOCATION" />
+	<uses-permission
+		android:name="android.permission.ACCESS_FINE_LOCATION" />
 	<application
 		android:icon="@drawable/icon"
 		android:label="@string/app_name">
-
 		<service
 			android:label="@string/flickr_service_label"
 			android:name=".FlickrService"
@@ -24,18 +26,6 @@
 				android:name="android.service.wallpaper"
 				android:resource="@xml/flickr" />
 		</service>
-
-		<activity
-			android:name=".FlickrSettings"
-			android:label="@string/app_name">
-			<intent-filter>
-				<action
-					android:name="android.intent.action.MAIN" />
-				<category
-					android:name="android.intent.category.LAUNCHER" />
-			</intent-filter>
-		</activity>
-
 	</application>
 
 	<uses-sdk
