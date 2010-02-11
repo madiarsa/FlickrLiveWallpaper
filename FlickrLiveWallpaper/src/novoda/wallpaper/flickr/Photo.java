@@ -33,7 +33,7 @@ public class Photo {
 	private int height_o;
 	private int width_o;
 
-	private final String URL_FORMAT = "http://farm%d.static.flickr.com/%d/%d_%s.jpg";
+	private final String URL_FORMAT = "http://farm%d.static.flickr.com/%d/%d_%s_b.jpg";
 
 	public Photo(int id, String owner, String secret, int server, int farm,
 			String title, boolean isPublic, boolean isFriend, boolean isFamily) {
@@ -52,8 +52,8 @@ public class Photo {
 	protected Photo() {
 	}
 
-	public String getPhotoURL() {
-		if (url_o != null && !url_o.equals("")) {
+	public String getPhotoURL(boolean original) {
+		if (url_o != null && !url_o.equals("") && original) {
 			return url_o;
 		} else {
 			return String.format(URL_FORMAT, farm, server, id, secret);
@@ -61,12 +61,16 @@ public class Photo {
 	}
 
 	public Bitmap getPhoto() throws IOException {
-		Log.i("Flickr", getPhotoURL() );
+		Log.i("Flickr", getPhotoURL(false) );
 		URLConnection connection = null;
-		connection = new URL(getPhotoURL()).openConnection();
+		connection = new URL(getPhotoURL(false)).openConnection();
 		BufferedInputStream bin = new BufferedInputStream(connection
 				.getInputStream(), 1024);
 		return BitmapFactory.decodeStream(bin);
+	}
+	
+	public Bitmap getPhoto(int desiredWidth, int desiredHeight) throws IOException {
+		return null;
 	}
 
 	/**

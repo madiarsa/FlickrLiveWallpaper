@@ -62,7 +62,6 @@ public class FlickrService extends WallpaperService {
 
 		@Override
 		public void onVisibilityChanged(boolean visible) {
-			super.onVisibilityChanged(visible);
 			if (visible) {
 				Thread t = new Thread() {
 					public void run() {
@@ -72,10 +71,18 @@ public class FlickrService extends WallpaperService {
 				};
 				t.start();
 			} else {
-				if (cachedBitmap != null)
-					cachedBitmap.recycle();
-				cachedBitmap = null;
+				//drawFrame();
 			}
+		}
+		
+
+		@Override
+		public void onDestroy() {
+			if (cachedBitmap != null)
+				cachedBitmap.recycle();
+			photo = null;
+			cachedBitmap = null;
+			super.onDestroy();
 		}
 
 		private void drawFrame() {
@@ -96,17 +103,20 @@ public class FlickrService extends WallpaperService {
 			final LocationManager locManager = (LocationManager) FlickrService.this
 					.getBaseContext()
 					.getSystemService(Context.LOCATION_SERVICE);
+
 			Location location = null;
 			for (String provider : locManager.getProviders(true)) {
 				location = locManager.getLastKnownLocation(provider);
 				if (location != null)
 					break;
 			}
+
 			if (location == null) {
 				// no location
 			} else {
 				final GregorianCalendar calendar = new GregorianCalendar();
 				final Flickr<Photo> f = new PhotoSearch();
+
 				List<Photo> list = f.with("accuracy", "11").with("lat",
 						"" + location.getLatitude()).with("lon",
 						"" + location.getLongitude()).with("tags",
@@ -114,9 +124,19 @@ public class FlickrService extends WallpaperService {
 						.with("sort", "interestingness-desc").with("media",
 								"photos").with("extras", "url_o")
 						.fetchStructuredDataList();
+
+				if (list.size() < 1) {
+					list = f.with("accuracy", "11").with("lat",
+							"" + location.getLatitude()).with("lon",
+							"" + location.getLongitude()).with("tags", "city")
+							.with("sort", "interestingness-desc").with("media",
+									"photos").with("extras", "url_o")
+							.fetchStructuredDataList();
+				}
+
 				for (Photo p : list) {
 					if (p.getUrl_o() != null
-							&& (p.getHeight_o() > height || p.getWidth_o() > width)) {
+							&& (p.getHeight_o() > height && p.getWidth_o() > width)) {
 						photo = p;
 						break;
 					}
@@ -126,7 +146,9 @@ public class FlickrService extends WallpaperService {
 					Bitmap original;
 					try {
 						original = photo.getPhoto();
-						cachedBitmap = scale(original, width, height);
+						if (original != null) {
+							cachedBitmap = scale(original, width, height);
+						}
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -170,15 +192,15 @@ public class FlickrService extends WallpaperService {
 				return "night";
 			}
 			// between 5 and 9 it is dawn
-			if (time > 5 && time <= 9) {
+			if (time > 5 && time <= 7) {
 				return "dawn";
 			}
 			// between 9 and 12 it is morning
-			if (time > 9 && time <= 12) {
+			if (time > 7 && time <= 11) {
 				return "morning";
 			}
 			// between 12 and 15 noon
-			if (time > 12 && time <= 15) {
+			if (time > 11 && time <= 15) {
 				return "noon";
 			}
 			// between 15 and 19 it is afternoon
