@@ -37,6 +37,7 @@ public class FlickrService extends WallpaperService {
 		private int width;
 		private int height;
 		private Photo photo = null;
+		private long lastSync = 0;
 
 		@Override
 		public void onCreate(SurfaceHolder surfaceHolder) {
@@ -62,7 +63,8 @@ public class FlickrService extends WallpaperService {
 
 		@Override
 		public void onVisibilityChanged(boolean visible) {
-			if (visible) {
+			if (visible
+					&& (System.currentTimeMillis() - lastSync) > 1000 * 60 * 60) {
 				Thread t = new Thread() {
 					public void run() {
 						getPhoto();
@@ -70,11 +72,10 @@ public class FlickrService extends WallpaperService {
 					}
 				};
 				t.start();
+				lastSync = System.currentTimeMillis();
 			} else {
-				//drawFrame();
 			}
 		}
-		
 
 		@Override
 		public void onDestroy() {

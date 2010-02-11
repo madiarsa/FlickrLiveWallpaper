@@ -12,7 +12,7 @@ public class PhotoTest extends TestCase {
 	
 	private Photo photo;
 
-	private final String URL = "http://farm5.static.flickr.com/4001/4341987094_7528f197ac.jpg";
+	private final String URL = "http://farm5.static.flickr.com/4001/4341987094_7528f197ac_b.jpg";
 	
 	protected void setUp() throws Exception {
 		super.setUp();
@@ -27,6 +27,6 @@ public class PhotoTest extends TestCase {
 	}
 	
 	public void testGettingPhotoURL() throws Exception {
-		assertEquals(URL, photo.getPhotoURL());
+		assertEquals(URL, photo.getPhotoURL(false));
 	}
 }
