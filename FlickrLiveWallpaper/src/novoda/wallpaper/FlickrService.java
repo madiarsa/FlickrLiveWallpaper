@@ -19,6 +19,7 @@ import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.service.wallpaper.WallpaperService;
+import android.util.Log;
 import android.view.Display;
 import android.view.SurfaceHolder;
 import android.view.WindowManager;
@@ -34,29 +35,30 @@ public class FlickrService extends WallpaperService {
 
 	class FlickrEngine extends Engine {
 		private Bitmap cachedBitmap = null;
-		private int width;
-		private int height;
+		private int displayWidth;
+		private int displayHeight;
 		private Photo photo = null;
 		private long lastSync = 0;
+		private float cachedTopMargin = 0;
+		private boolean alignImgInMiddle = true;
 
 		@Override
 		public void onCreate(SurfaceHolder surfaceHolder) {
 			Display dm = ((WindowManager) getSystemService(WINDOW_SERVICE))
 					.getDefaultDisplay();
-			width = dm.getWidth();
-			height = dm.getHeight();
+			displayWidth = dm.getWidth();
+			displayHeight = dm.getHeight();
 			super.onCreate(surfaceHolder);
 		}
 
 		@Override
 		public Bundle onCommand(String action, int x, int y, int z,
 				Bundle extras, boolean resultRequested) {
-			if (action.equals(WallpaperManager.COMMAND_TAP) && photo != null
-					&& !photo.getUrl_o().equalsIgnoreCase("")) {
-				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri
-						.parse(photo.getUrl_o()));
-				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				startActivity(intent);
+			if (action.equals(WallpaperManager.COMMAND_TAP) && photo != null && !photo.getUrl_o().equalsIgnoreCase("")) {
+//				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(photo.getUrl_o()));
+//				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+//				startActivity(intent);
+				
 			}
 			return super.onCommand(action, x, y, z, extras, resultRequested);
 		}
@@ -92,7 +94,7 @@ public class FlickrService extends WallpaperService {
 			try {
 				c = holder.lockCanvas();
 				if (c != null && cachedBitmap != null) {
-					c.drawBitmap(cachedBitmap, 0, 0, new Paint());
+					c.drawBitmap(cachedBitmap, 0, cachedTopMargin , new Paint());
 				}
 			} finally {
 				if (c != null)
@@ -137,7 +139,7 @@ public class FlickrService extends WallpaperService {
 
 				for (Photo p : list) {
 					if (p.getUrl_o() != null
-							&& (p.getHeight_o() > height && p.getWidth_o() > width)) {
+							&& (p.getHeight_o() > displayHeight && p.getWidth_o() > displayWidth)) {
 						photo = p;
 						break;
 					}
@@ -148,7 +150,7 @@ public class FlickrService extends WallpaperService {
 					try {
 						original = photo.getPhoto();
 						if (original != null) {
-							cachedBitmap = scale(original, width, height);
+							cachedBitmap = scale(original, displayWidth, displayHeight);
 						}
 					} catch (IOException e) {
 						e.printStackTrace();
@@ -170,14 +172,36 @@ public class FlickrService extends WallpaperService {
 			final int bitmapWidth = bitmap.getWidth();
 			final int bitmapHeight = bitmap.getHeight();
 
-			final float scale = Math.max((float) width / (float) bitmapWidth,
-					(float) height / (float) bitmapHeight);
+			final float scale;
+			
+			if(alignImgInMiddle ){
+				scale = Math.min((float) width / (float) bitmapWidth, (float) height / (float) bitmapHeight);
+			}else{
+				scale = Math.max((float) width / (float) bitmapWidth, (float) height / (float) bitmapHeight);
+			}
 
 			final int scaledWidth = (int) (bitmapWidth * scale);
 			final int scaledHeight = (int) (bitmapHeight * scale);
-			return Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight,
-					true);
+			
+			Log.d(TAG, "Scaling Bitmap (height x width): Orginal[" + bitmapHeight +"x" + bitmapWidth +"], New[" + scaledHeight +"x"+scaledWidth + "]");
+			Bitmap createScaledBitmap = Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight,	true);
+			
+			/*
+			 * Work out the Top Margin to align the image in the middle of the screen
+			 * screenDivisions = totalScreenHeight/BitmapHeight
+			 * cachedTopMargin = (screenDivisions * 0.5) + (BitmapHeight*0.5)
+			 * 
+			 */
+			if(scaledHeight < 800){
+				cachedTopMargin = Math.round(((float)(Math.min((float)displayHeight, (float)scaledHeight)) *0.5)+ ((float)scaledHeight*0.5)); 
+			}else{
+				cachedTopMargin = 0;
+			}
+			
+			return createScaledBitmap;
 		}
+
+		
 
 		/**
 		 * Returns a human readable tag which will be used with the search
