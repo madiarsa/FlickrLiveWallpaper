@@ -15,6 +15,7 @@ import android.util.Pair;
 @SuppressWarnings("unchecked")
 public abstract class Flickr<T> {
 
+	private static final String TAG = Flickr.class.getSimpleName();
 	private final String URL = "http://api.flickr.com/services/rest/";
 	private String api = "655ba9dc4418959a43a9c37aa4acea49";
 	private List<Pair> arguments = new ArrayList<Pair>();
@@ -64,7 +65,7 @@ public abstract class Flickr<T> {
 					p.second.toString()).append('&');
 		}
 		builder.deleteCharAt(builder.length() - 1);
-		Log.i("Flickr", "will call " + builder.toString());
+		Log.d(TAG, "Calling Flickr API with URL [" + builder.toString()+"]");
 		return builder.toString();
 	}
 }

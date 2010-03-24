@@ -1,13 +1,34 @@
 package novoda.wallpaper;
 
-import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceActivity;
 
-public class FlickrSettings extends Activity {
-    /** Called when the activity is first created. */
+public class FlickrSettings extends PreferenceActivity
+    implements SharedPreferences.OnSharedPreferenceChangeListener {
+
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.main);
+    protected void onCreate(Bundle icicle) {
+        super.onCreate(icicle);
+        getPreferenceManager().setSharedPreferencesName(FlickrService.SHARED_PREFS_NAME);
+        addPreferencesFromResource(R.xml.flickr_settings);
+        getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(
+                this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
+    @Override
+    protected void onDestroy() {
+        getPreferenceManager().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(
+                this);
+        super.onDestroy();
+    }
+
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
+            String key) {
     }
 }

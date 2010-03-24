@@ -20,6 +20,9 @@ import android.util.Log;
  * 
  */
 public class Photo {
+
+	private static final String TAG = Photo.class.getSimpleName();
+	
 	private long id;
 	private String owner;
 	private String secret;
@@ -61,11 +64,10 @@ public class Photo {
 	}
 
 	public Bitmap getPhoto() throws IOException {
-		Log.i("Flickr", getPhotoURL(false) );
+		Log.i(TAG, "Retrieving photo from URL=[" +getPhotoURL(false)+ "]");
 		URLConnection connection = null;
 		connection = new URL(getPhotoURL(false)).openConnection();
-		BufferedInputStream bin = new BufferedInputStream(connection
-				.getInputStream(), 1024);
+		BufferedInputStream bin = new BufferedInputStream(connection.getInputStream(), 1024);
 		return BitmapFactory.decodeStream(bin);
 	}
 	

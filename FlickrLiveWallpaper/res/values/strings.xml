@@ -4,5 +4,9 @@
     <string name="app_name">FlickrLiveWallpaper</string>
 <string name="flickr_service_label">Flickr</string>
 <string name="author">Novoda ltd</string>
+<string name="flickr_settings">Settings</string>
+<string name="flickr_settings_title">Wallpaper settings</string>
+<string name="flickr_settings_summary">Scroll the whole picture on your dashboard or scale it down.</string>
 <string name="description">Simple flickr wallpaper which adapts itself to your location and time</string>
 </resources>
+            

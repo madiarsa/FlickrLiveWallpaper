@@ -5,30 +5,34 @@
 	android:versionCode="1"
 	android:versionName="1.0">
 
+	<uses-sdk android:minSdkVersion="7" />
+    <uses-feature android:name="android.software.live_wallpaper" />
+    
 	<uses-permission
 		android:name="android.permission.INTERNET" />
 	<uses-permission
 		android:name="android.permission.ACCESS_COARSE_LOCATION" />
 	<uses-permission
 		android:name="android.permission.ACCESS_FINE_LOCATION" />
+		
 	<application
-		android:icon="@drawable/icon"
-		android:label="@string/app_name">
+		android:label="@string/app_name"
+		android:icon="@drawable/icon">
 		<service
 			android:label="@string/flickr_service_label"
 			android:name=".FlickrService"
 			android:permission="android.permission.BIND_WALLPAPER">
 			<intent-filter>
-				<action
-					android:name="android.service.wallpaper.WallpaperService" />
+				<action android:name="android.service.wallpaper.WallpaperService" />
 			</intent-filter>
-			<meta-data
-				android:name="android.service.wallpaper"
-				android:resource="@xml/flickr" />
+			<meta-data android:name="android.service.wallpaper" android:resource="@xml/flickr" />
 		</service>
+		<activity
+            android:label="@string/flickr_settings"
+            android:name=".FlickrSettings"
+            android:theme="@android:style/Theme.Light.WallpaperSettings"
+            android:exported="true">
+        </activity>
 	</application>
-
-	<uses-sdk
-		android:minSdkVersion="7" />
 
 </manifest> 

@@ -11,6 +11,7 @@ import novoda.wallpaper.flickr.PhotoSearch;
 import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -18,6 +19,7 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
 import android.view.Display;
@@ -27,13 +29,32 @@ import android.view.WindowManager;
 public class FlickrService extends WallpaperService {
 
 	public static final String TAG = FlickrService.class.getSimpleName();
-
+	public static final String SHARED_PREFS_NAME = "flickrSettings";
+	
 	@Override
 	public Engine onCreateEngine() {
 		return new FlickrEngine();
 	}
 
-	class FlickrEngine extends Engine {
+	class FlickrEngine extends Engine implements SharedPreferences.OnSharedPreferenceChangeListener{
+		
+		private final Handler mHandler = new Handler();
+		
+        private final Runnable mDrawWallpaper = new Runnable() {
+        	public void run() {
+                if (currentlyVisibile) {
+                	getPhoto();
+                	drawFrame();
+                }else{
+                	Log.d(TAG, "Waiting until wallpaper becomes visible");
+                	mHandler.postDelayed(mDrawWallpaper, 1000);
+                }
+        	}
+        };
+
+		private static final String PREF_SCALE_TYPE_FULL = "full";
+		private static final String PREF_SCALE_TYPE_MIDDLE = "middle";
+		private static final String PREF_SCALE_TYPE = "flickr_scale";
 		private Bitmap cachedBitmap = null;
 		private int displayWidth;
 		private int displayHeight;
@@ -41,23 +62,31 @@ public class FlickrService extends WallpaperService {
 		private long lastSync = 0;
 		private float cachedTopMargin = 0;
 		private boolean alignImgInMiddle = true;
+        private SharedPreferences mPrefs;
 
+		private boolean currentlyVisibile = false;
+
+        
 		@Override
 		public void onCreate(SurfaceHolder surfaceHolder) {
+			super.onCreate(surfaceHolder);
 			Display dm = ((WindowManager) getSystemService(WINDOW_SERVICE))
 					.getDefaultDisplay();
 			displayWidth = dm.getWidth();
 			displayHeight = dm.getHeight();
-			super.onCreate(surfaceHolder);
+			
+            mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, 0);
+            mPrefs.registerOnSharedPreferenceChangeListener(this);
+            onSharedPreferenceChanged(mPrefs, null);
 		}
 
 		@Override
 		public Bundle onCommand(String action, int x, int y, int z,
 				Bundle extras, boolean resultRequested) {
 			if (action.equals(WallpaperManager.COMMAND_TAP) && photo != null && !photo.getUrl_o().equalsIgnoreCase("")) {
-//				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(photo.getUrl_o()));
-//				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//				startActivity(intent);
+				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(photo.getUrl_o()));
+				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				startActivity(intent);
 				
 			}
 			return super.onCommand(action, x, y, z, extras, resultRequested);
@@ -65,17 +94,15 @@ public class FlickrService extends WallpaperService {
 
 		@Override
 		public void onVisibilityChanged(boolean visible) {
-			if (visible
-					&& (System.currentTimeMillis() - lastSync) > 1000 * 60 * 60) {
-				Thread t = new Thread() {
-					public void run() {
-						getPhoto();
-						drawFrame();
-					}
-				};
-				t.start();
-				lastSync = System.currentTimeMillis();
+			boolean reSynchNeeded = (System.currentTimeMillis() - lastSync) > 1000 * 60 * 60;
+			currentlyVisibile = visible;
+			if (visible) {
+				if(reSynchNeeded){
+					mHandler.post(mDrawWallpaper);
+					lastSync = System.currentTimeMillis();
+				}
 			} else {
+                mHandler.removeCallbacks(mDrawWallpaper);
 			}
 		}
 
@@ -85,10 +112,12 @@ public class FlickrService extends WallpaperService {
 				cachedBitmap.recycle();
 			photo = null;
 			cachedBitmap = null;
+            mHandler.removeCallbacks(mDrawWallpaper);
 			super.onDestroy();
 		}
 
 		private void drawFrame() {
+			Log.d(TAG, "Drawing Image");
 			final SurfaceHolder holder = getSurfaceHolder();
 			Canvas c = null;
 			try {
@@ -103,6 +132,8 @@ public class FlickrService extends WallpaperService {
 		}
 
 		private void getPhoto() {
+			Log.d(TAG, "Retrieving Image");
+			
 			final LocationManager locManager = (LocationManager) FlickrService.this
 					.getBaseContext()
 					.getSystemService(Context.LOCATION_SERVICE);
@@ -117,13 +148,12 @@ public class FlickrService extends WallpaperService {
 			if (location == null) {
 				// no location
 			} else {
-				final GregorianCalendar calendar = new GregorianCalendar();
 				final Flickr<Photo> f = new PhotoSearch();
 
 				List<Photo> list = f.with("accuracy", "11").with("lat",
 						"" + location.getLatitude()).with("lon",
 						"" + location.getLongitude()).with("tags",
-						getHumanizeDate(calendar.get(Calendar.HOUR_OF_DAY)))
+						getHumanizeDate(new GregorianCalendar().get(Calendar.HOUR_OF_DAY)))
 						.with("sort", "interestingness-desc").with("media",
 								"photos").with("extras", "url_o")
 						.fetchStructuredDataList();
@@ -146,16 +176,23 @@ public class FlickrService extends WallpaperService {
 				}
 
 				if (cachedBitmap == null && photo != null) {
-					Bitmap original;
-					try {
-						original = photo.getPhoto();
-						if (original != null) {
-							cachedBitmap = scale(original, displayWidth, displayHeight);
-						}
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+					cachedBitmap = refreshCachedImage();
 				}
+			}
+		}
+
+		private Bitmap refreshCachedImage() {
+			Bitmap original=null;
+			try {
+				original = photo.getPhoto();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			if (original != null) {
+				return scaleImage(original, displayWidth, displayHeight);
+			}else{
+				return null;
 			}
 		}
 
@@ -168,7 +205,7 @@ public class FlickrService extends WallpaperService {
 		 * @param height
 		 * @return
 		 */
-		Bitmap scale(Bitmap bitmap, int width, int height) {
+		Bitmap scaleImage(Bitmap bitmap, int width, int height) {
 			final int bitmapWidth = bitmap.getWidth();
 			final int bitmapHeight = bitmap.getHeight();
 
@@ -239,5 +276,26 @@ public class FlickrService extends WallpaperService {
 			// should not be here but just in case as it s getting late
 			return "city";
 		}
+
+		public void onSharedPreferenceChanged(
+				SharedPreferences sharedPreferences, String key) {
+			String scaleSetting = sharedPreferences.getString(PREF_SCALE_TYPE, PREF_SCALE_TYPE_MIDDLE);
+			
+			boolean beforePrefCalled=alignImgInMiddle;
+			
+			
+			if(scaleSetting.equals(PREF_SCALE_TYPE_FULL)){
+				alignImgInMiddle = false;
+			}else{
+				alignImgInMiddle = true;
+			}
+			
+			if(!(alignImgInMiddle == beforePrefCalled)){
+				Log.i(TAG, "pref changed");
+				mHandler.post(mDrawWallpaper);
+			}
+			
+		}
+		
 	}
 }
