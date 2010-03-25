@@ -1,9 +1,11 @@
 package novoda.wallpaper;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Random;
 
 import novoda.wallpaper.flickr.Flickr;
 import novoda.wallpaper.flickr.Photo;
@@ -46,8 +48,8 @@ public class FlickrService extends WallpaperService {
                 	getPhoto();
                 	drawFrame();
                 }else{
-                	Log.d(TAG, "Waiting until wallpaper becomes visible");
-                	mHandler.postDelayed(mDrawWallpaper, 1000);
+                	//Waiting until wallpaper becomes visible
+                	mHandler.postDelayed(mDrawWallpaper, 2000);
                 }
         	}
         };
@@ -63,7 +65,8 @@ public class FlickrService extends WallpaperService {
 		private float cachedTopMargin = 0;
 		private boolean alignImgInMiddle = true;
         private SharedPreferences mPrefs;
-
+		private Random randomWheel = new Random();
+		private DecimalFormat df = new DecimalFormat("#.######");
 		private boolean currentlyVisibile = false;
 
         
@@ -150,32 +153,40 @@ public class FlickrService extends WallpaperService {
 			} else {
 				final Flickr<Photo> f = new PhotoSearch();
 
-				List<Photo> list = f.with("accuracy", "11").with("lat",
-						"" + location.getLatitude()).with("lon",
-						"" + location.getLongitude()).with("tags",
-						getHumanizeDate(new GregorianCalendar().get(Calendar.HOUR_OF_DAY)))
-						.with("sort", "interestingness-desc").with("media",
-								"photos").with("extras", "url_o")
-						.fetchStructuredDataList();
+				double latitude = location.getLatitude();
+				double longitude = location.getLongitude();
+				Log.i(TAG, "Longitude=["+longitude+"] latitude=["+latitude+"]");
+				
+				//Random no. between 0.1 > 0.0099
+				double d = randomWheel.nextDouble();
+				d = Double.valueOf(df.format((d * (0.1 - 0.0099))));
+				Log.i(TAG, "latitude =" + (df.format( latitude + d)));
+				
+				//Add random to ensure varying results
+				f.with("lat","" + df.format( latitude + d));
+				f.with("lon", "" + df.format( longitude + d));
+				f.with("accuracy", "16");
+				f.with("tags",	getHumanizeDate(new GregorianCalendar().get(Calendar.HOUR_OF_DAY)));
+				f.with("sort", "interestingness-desc");
+				f.with("media", "photos");
+				f.with("extras", "url_o");
+				f.with("per_page", "1");
+				f.with("page", ""+ randomWheel.nextInt(5));
+				List<Photo> list = f.fetchStructuredDataList();
 
 				if (list.size() < 1) {
-					list = f.with("accuracy", "11").with("lat",
-							"" + location.getLatitude()).with("lon",
-							"" + location.getLongitude()).with("tags", "city")
-							.with("sort", "interestingness-desc").with("media",
-									"photos").with("extras", "url_o")
-							.fetchStructuredDataList();
+					f.remove("accuracy", "16");
+					f.with("accuracy", "11");
 				}
 
 				for (Photo p : list) {
-					if (p.getUrl_o() != null
-							&& (p.getHeight_o() > displayHeight && p.getWidth_o() > displayWidth)) {
+					if (p.getUrl_o() != null) {
 						photo = p;
 						break;
 					}
 				}
 
-				if (cachedBitmap == null && photo != null) {
+				if (photo != null) {
 					cachedBitmap = refreshCachedImage();
 				}
 			}
@@ -229,7 +240,7 @@ public class FlickrService extends WallpaperService {
 			 * cachedTopMargin = (screenDivisions * 0.5) + (BitmapHeight*0.5)
 			 * 
 			 */
-			if(scaledHeight < 800){
+			if(alignImgInMiddle){
 				cachedTopMargin = Math.round(((float)(Math.min((float)displayHeight, (float)scaledHeight)) *0.5)+ ((float)scaledHeight*0.5)); 
 			}else{
 				cachedTopMargin = 0;

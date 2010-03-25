@@ -41,6 +41,11 @@ public abstract class Flickr<T> {
 		return this;
 	}
 	
+	public Flickr<T> remove(String key, String value) {
+		arguments.remove(new Pair<String, String>(key, value));
+		return this;
+	}
+	
 	public Flickr<T> with(String key, String value) {
 		return with(new Pair<String, String>(key, value));
 	}

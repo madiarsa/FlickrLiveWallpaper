@@ -22,7 +22,7 @@ import android.util.Log;
 public class Photo {
 
 	private static final String TAG = Photo.class.getSimpleName();
-	
+
 	private long id;
 	private String owner;
 	private String secret;
@@ -64,14 +64,16 @@ public class Photo {
 	}
 
 	public Bitmap getPhoto() throws IOException {
-		Log.i(TAG, "Retrieving photo from URL=[" +getPhotoURL(false)+ "]");
+		Log.i(TAG, "Retrieving photo from URL=[" + getPhotoURL(false) + "]");
 		URLConnection connection = null;
 		connection = new URL(getPhotoURL(false)).openConnection();
-		BufferedInputStream bin = new BufferedInputStream(connection.getInputStream(), 1024);
+		BufferedInputStream bin = new BufferedInputStream(connection
+				.getInputStream(), 1024);
 		return BitmapFactory.decodeStream(bin);
 	}
-	
-	public Bitmap getPhoto(int desiredWidth, int desiredHeight) throws IOException {
+
+	public Bitmap getPhoto(int desiredWidth, int desiredHeight)
+			throws IOException {
 		return null;
 	}
 
@@ -84,10 +86,14 @@ public class Photo {
 	 *         occurs
 	 */
 	public static Photo fromXML(String photoTag) {
+		
+		Log.d(TAG, "Parsing xml photo ["+photoTag+"]");
 		Photo photo = new Photo();
 		if (photoTag == null)
 			return photo;
+		
 		XmlPullParserFactory factory;
+		
 		try {
 			factory = XmlPullParserFactory.newInstance();
 			factory.setNamespaceAware(true);
@@ -139,6 +145,13 @@ public class Photo {
 	// can't get raw string from xpp so adapting badly with no DRY...
 	// TODO make it DRY
 	public static Photo fromXPP(XmlPullParser xpp) {
+		
+		for(int i=0;i<xpp.getAttributeCount();i++){
+			Log.i(TAG, "Attribute ="+ xpp.getAttributeValue(i));
+			
+		}
+		
+		Log.d(TAG, "--");
 		Photo photo = new Photo();
 		try {
 			int isFamily = new Integer(xpp.getAttributeValue(null, "isfamily"));
