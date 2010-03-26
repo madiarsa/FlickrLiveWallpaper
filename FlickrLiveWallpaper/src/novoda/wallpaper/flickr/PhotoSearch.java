@@ -60,16 +60,5 @@ public class PhotoSearch extends Flickr<Photo> {
 		return "flickr.photos.search";
 	}
 
-	public Bitmap getBitmap(Map<String, Object> specs) throws IOException {
-		Log.i(TAG, "Retrieving photo from URL=[" + specs.get("url")
-				+ "] width=" + specs.get("width") + " height="
-				+ specs.get("height"));
-		URLConnection connection = new URL((String) specs.get("url"))
-				.openConnection();
-		InputStream inputStream = connection.getInputStream();
-		BufferedInputStream bin = new BufferedInputStream(inputStream, 1024);
-		return BitmapFactory.decodeStream(bin);
-	}
-
 	private static final String TAG = PhotoSearch.class.getSimpleName();
 }

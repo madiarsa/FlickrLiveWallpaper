@@ -77,11 +77,8 @@ public class Photo {
 
 	public String getPhotoURL(boolean original) {
 		if (hiResImg_url != null && !hiResImg_url.equals("") && original) {
-			Log.i(TAG, "Hi Res URL = " + hiResImg_url);
 			return hiResImg_url;
 		} else {
-			Log.i(TAG, "Formatted URL = "
-					+ String.format(URL_FORMAT, farm, server, id, secret));
 			return String.format(URL_FORMAT, farm, server, id, secret);
 		}
 	}

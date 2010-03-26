@@ -144,17 +144,14 @@ public class FlickrService extends WallpaperService {
 				// List<Photo> list = getPhotosFromExactLocation(location);
 				List<Photo> photos = getPhotosFromSurrounding(location);
 				PhotoSpec<String, Object> photoSpecs = getBestSpecs(photos);
-				Log.d(TAG,
-						"Photo retireved from  1st request service looks like this: url["
-								+ photos.toString());
 
 				if (photoSpecs != null) {
-					cachedBitmap = refreshCachedImage(photoSpecs);
+					cachedBitmap = retrievePhotoFromSpecs(photoSpecs);
 				}
 			}
 		}
 
-		private Bitmap refreshCachedImage(PhotoSpec<String, Object> photoSpecs) {
+		private Bitmap retrievePhotoFromSpecs(PhotoSpec<String, Object> photoSpecs) {
 			Bitmap original = null;
 			URL photoUrl = null;
 		
@@ -177,10 +174,9 @@ public class FlickrService extends WallpaperService {
 			}
 		
 			if (original != null) {
-				Log.i(TAG, "Original is not null");
 				original = scaleImage(original, displayWidth, displayHeight);
 			} else {
-				Log.i(TAG, "Original is null");
+				Log.e(TAG, "Image returned from Service was null");
 			}
 		
 			return original;
@@ -202,7 +198,7 @@ public class FlickrService extends WallpaperService {
 			final float scale;
 		
 			if (alignImgInMiddle) {
-					scale = Math.min((float) width / (float) bitmapWidth, (float) height / (float) bitmapHeight);
+				scale = Math.min((float) width / (float) bitmapWidth, (float) height / (float) bitmapHeight);
 			} else {
 				scale = Math.max((float) width / (float) bitmapWidth,
 						(float) height / (float) bitmapHeight);
@@ -228,7 +224,6 @@ public class FlickrService extends WallpaperService {
 						(float) displayHeight, (float) scaledHeight);
 				cachedTopMargin = Math
 						.round((screenDividedByPic - (float) scaledHeight * 0.5));
-				Log.i(TAG, "Rounded = " + cachedTopMargin);
 			} else {
 				cachedTopMargin = 0;
 			}
@@ -250,8 +245,11 @@ public class FlickrService extends WallpaperService {
 			return location;
 		}
 
+		/*
+		 * From the suitable specs collected, one is chosen at random. 
+		 */
 		private PhotoSpec<String, Object> getBestSpecs(List<Photo> photos) {
-			Log.i(TAG, "Choosing a photo from amoungst those with URLs");
+			Log.v(TAG, "Choosing a photo from amoungst those with URLs");
 			PhotoSpec<String, Object> spec = new PhotoSpec<String, Object>();
 			List<PhotoSpec<String, Object>> options = new ArrayList<PhotoSpec<String, Object>>();
 			for (Photo p : photos) {
@@ -282,7 +280,6 @@ public class FlickrService extends WallpaperService {
 			
 			int opts = options.size();
 			if(opts>1){
-				Log.i(TAG, "Options ="+opts);
 				opts=randomWheel.nextInt(opts-1);
 				return options.get(opts);
 			}
@@ -290,6 +287,11 @@ public class FlickrService extends WallpaperService {
 			return options.get(0);
 		}
 
+		/*
+		 * Use location to establish a place name via the GeoName API
+		 * Query Flickr to establish if photos are available
+		 * Requery if photos can be divided into pages (to help randomness)
+		 */
 		private List<Photo> getPhotosFromSurrounding(Location location) {
 			Log
 					.d(TAG,
@@ -310,20 +312,12 @@ public class FlickrService extends WallpaperService {
 			
 			
 			if(list.size()>1){
-				Log.i(TAG, "Size = "+ list.size());
 				int square = (int)Math.sqrt(list.size());
-				Log.i(TAG, "lowest divider possible= "+ square);
-				
 				photoSearch.with("per_page", ""+square);
 				photoSearch.with("page", ""+ randomWheel.nextInt(square-1));
 				list = photoSearch.fetchStructuredDataList();
 			}
 			
-
-			for (int i = 0; i < list.size(); i++) {
-				Log.i(TAG, "Photo in list= " + list.get(i).toString());
-			}
-
 			return list;
 		}
 
