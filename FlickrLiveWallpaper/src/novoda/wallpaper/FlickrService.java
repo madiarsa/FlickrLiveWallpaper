@@ -91,7 +91,7 @@ public class FlickrService extends WallpaperService {
 
 		@Override
 		public void onDestroy() {
-			if (cachedBitmap != null){
+			if (cachedBitmap != null) {
 				cachedBitmap.recycle();
 			}
 			photo = null;
@@ -151,17 +151,18 @@ public class FlickrService extends WallpaperService {
 			}
 		}
 
-		private Bitmap retrievePhotoFromSpecs(PhotoSpec<String, Object> photoSpecs) {
+		private Bitmap retrievePhotoFromSpecs(
+				PhotoSpec<String, Object> photoSpecs) {
 			Bitmap original = null;
 			URL photoUrl = null;
-		
+
 			try {
 				photoUrl = new URL((String) photoSpecs
 						.get(PhotoSpec.PHOTOSPEC_URL));
 			} catch (MalformedURLException error) {
 				error.printStackTrace();
 			}
-		
+
 			try {
 				HttpURLConnection connection = (HttpURLConnection) photoUrl
 						.openConnection();
@@ -172,13 +173,13 @@ public class FlickrService extends WallpaperService {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-		
+
 			if (original != null) {
 				original = scaleImage(original, displayWidth, displayHeight);
 			} else {
 				Log.e(TAG, "Image returned from Service was null");
 			}
-		
+
 			return original;
 		}
 
@@ -194,25 +195,26 @@ public class FlickrService extends WallpaperService {
 		Bitmap scaleImage(Bitmap bitmap, int width, int height) {
 			final int bitmapWidth = bitmap.getWidth();
 			final int bitmapHeight = bitmap.getHeight();
-		
+
 			final float scale;
-		
+
 			if (alignImgInMiddle) {
-				scale = Math.min((float) width / (float) bitmapWidth, (float) height / (float) bitmapHeight);
+				scale = Math.min((float) width / (float) bitmapWidth,
+						(float) height / (float) bitmapHeight);
 			} else {
 				scale = Math.max((float) width / (float) bitmapWidth,
 						(float) height / (float) bitmapHeight);
 			}
-		
+
 			final int scaledWidth = (int) (bitmapWidth * scale);
 			final int scaledHeight = (int) (bitmapHeight * scale);
-		
+
 			Log.d(TAG, "Scaling Bitmap (height x width): Orginal["
 					+ bitmapHeight + "x" + bitmapWidth + "], New["
 					+ scaledHeight + "x" + scaledWidth + "]");
 			Bitmap createScaledBitmap = Bitmap.createScaledBitmap(bitmap,
 					scaledWidth, scaledHeight, true);
-		
+
 			/*
 			 * Work out the Top Margin to align the image in the middle of the
 			 * screen with a slightly larger bottom gutter for framing
@@ -227,18 +229,18 @@ public class FlickrService extends WallpaperService {
 			} else {
 				cachedTopMargin = 0;
 			}
-		
+
 			return createScaledBitmap;
 		}
 
 		private Location getRecentLocation() {
 			final LocationManager locManager = (LocationManager) FlickrService.this
-			.getBaseContext()
-			.getSystemService(Context.LOCATION_SERVICE);
-			Location location =null;
+					.getBaseContext()
+					.getSystemService(Context.LOCATION_SERVICE);
+			Location location = null;
 			for (String provider : locManager.getProviders(true)) {
 				location = locManager.getLastKnownLocation(provider);
-				if (location != null){
+				if (location != null) {
 					break;
 				}
 			}
@@ -246,7 +248,7 @@ public class FlickrService extends WallpaperService {
 		}
 
 		/*
-		 * From the suitable specs collected, one is chosen at random. 
+		 * From the suitable specs collected, one is chosen at random.
 		 */
 		private PhotoSpec<String, Object> getBestSpecs(List<Photo> photos) {
 			Log.v(TAG, "Choosing a photo from amoungst those with URLs");
@@ -277,20 +279,20 @@ public class FlickrService extends WallpaperService {
 					spec = new PhotoSpec<String, Object>();
 				}
 			}
-			
+
 			int opts = options.size();
-			if(opts>1){
-				opts=randomWheel.nextInt(opts-1);
+			if (opts > 1) {
+				opts = randomWheel.nextInt(opts - 1);
 				return options.get(opts);
 			}
-			
+
 			return options.get(0);
 		}
 
 		/*
-		 * Use location to establish a place name via the GeoName API
-		 * Query Flickr to establish if photos are available
-		 * Requery if photos can be divided into pages (to help randomness)
+		 * Use location to establish a place name via the GeoName API Query
+		 * Flickr to establish if photos are available Requery if photos can be
+		 * divided into pages (to help randomness)
 		 */
 		private List<Photo> getPhotosFromSurrounding(Location location) {
 			Log
@@ -309,15 +311,14 @@ public class FlickrService extends WallpaperService {
 			photoSearch.with("extras", "url_s");
 			photoSearch.with("per_page", "50");
 			List<Photo> list = photoSearch.fetchStructuredDataList();
-			
-			
-			if(list.size()>1){
-				int square = (int)Math.sqrt(list.size());
-				photoSearch.with("per_page", ""+square);
-				photoSearch.with("page", ""+ randomWheel.nextInt(square-1));
+
+			if (list.size() > 1) {
+				int square = (int) Math.sqrt(list.size());
+				photoSearch.with("per_page", "" + square);
+				photoSearch.with("page", "" + randomWheel.nextInt(square - 1));
 				list = photoSearch.fetchStructuredDataList();
 			}
-			
+
 			return list;
 		}
 
