@@ -1,14 +1,25 @@
 package novoda.wallpaper.flickr;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Log;
+
 public class PhotoSearch extends Flickr<Photo> {
+
+	private static final String TAG = PhotoSearch.class.getSimpleName();
 
 	@Override
 	public List<Photo> fetchStructuredDataList() {
@@ -43,9 +54,17 @@ public class PhotoSearch extends Flickr<Photo> {
 		}
 		return ret;
 	}
-
+	
 	@Override
 	public String getMethod() {
 		return "flickr.photos.search";
+	}
+	
+	public Bitmap getBitmap(Map<String, Object> specs) throws IOException {
+		Log.i(TAG, "Retrieving photo from URL=[" + specs.get("url") + "] width="+specs.get("width")+" height=" +specs.get("height"));
+		URLConnection connection = new URL((String) specs.get("url")).openConnection();
+		InputStream inputStream = connection.getInputStream();
+		BufferedInputStream bin = new BufferedInputStream(inputStream, 1024);
+		return BitmapFactory.decodeStream(bin);
 	}
 }

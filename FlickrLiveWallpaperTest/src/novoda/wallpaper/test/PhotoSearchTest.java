@@ -14,7 +14,7 @@ public class PhotoSearchTest extends InstrumentationTestCase {
 		MockObj m = new MockObj();
 		assertEquals(250, m.fetchStructuredDataList().size());
 		Photo photo = m.fetchStructuredDataList().get(3);
-		assertEquals("41073876@N00", photo.getOwner());
+		assertEquals("41073876@N00", photo.owner);
 	}
 
 	private class MockObj extends PhotoSearch {

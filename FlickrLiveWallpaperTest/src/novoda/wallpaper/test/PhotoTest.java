@@ -20,10 +20,10 @@ public class PhotoTest extends TestCase {
 	}
 
 	public void testShouldParseAPhotoXML() throws Exception {
-		assertEquals(4341987094L, photo.getId());
-		assertEquals("41073876@N00", photo.getOwner());
-		assertTrue(photo.isPublic());
-		assertFalse(photo.isFriend());
+		assertEquals(4341987094L, photo.id);
+		assertEquals("41073876@N00", photo.owner);
+		assertTrue(photo.isPublic);
+		assertFalse(photo.isFriend);
 	}
 	
 	public void testGettingPhotoURL() throws Exception {

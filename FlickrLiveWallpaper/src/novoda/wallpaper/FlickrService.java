@@ -1,12 +1,23 @@
 package novoda.wallpaper;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
+import novoda.net.GeoNamesAPI;
 import novoda.wallpaper.flickr.Flickr;
 import novoda.wallpaper.flickr.Photo;
 import novoda.wallpaper.flickr.PhotoSearch;
@@ -15,6 +26,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.location.Location;
@@ -68,8 +80,9 @@ public class FlickrService extends WallpaperService {
 		private Random randomWheel = new Random();
 		private DecimalFormat df = new DecimalFormat("#.######");
 		private boolean currentlyVisibile = false;
+		private GeoNamesAPI geoNamesAPI;
+		private PhotoSearch photoSearch = new PhotoSearch();
 
-        
 		@Override
 		public void onCreate(SurfaceHolder surfaceHolder) {
 			super.onCreate(surfaceHolder);
@@ -81,13 +94,14 @@ public class FlickrService extends WallpaperService {
             mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, 0);
             mPrefs.registerOnSharedPreferenceChangeListener(this);
             onSharedPreferenceChanged(mPrefs, null);
+			geoNamesAPI = new GeoNamesAPI();
 		}
 
 		@Override
 		public Bundle onCommand(String action, int x, int y, int z,
 				Bundle extras, boolean resultRequested) {
-			if (action.equals(WallpaperManager.COMMAND_TAP) && photo != null && !photo.getUrl_o().equalsIgnoreCase("")) {
-				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(photo.getUrl_o()));
+			if (action.equals(WallpaperManager.COMMAND_TAP) && photo != null && !photo.hiResImg_url.equalsIgnoreCase("")) {
+				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(photo.hiResImg_url));
 				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				startActivity(intent);
 				
@@ -135,7 +149,7 @@ public class FlickrService extends WallpaperService {
 		}
 
 		private void getPhoto() {
-			Log.d(TAG, "Retrieving Image");
+			Log.d(TAG, "getPhoto called to retrieve image from FlickrAPI");
 			
 			final LocationManager locManager = (LocationManager) FlickrService.this
 					.getBaseContext()
@@ -151,60 +165,135 @@ public class FlickrService extends WallpaperService {
 			if (location == null) {
 				// no location
 			} else {
-				final Flickr<Photo> f = new PhotoSearch();
-
-				double latitude = location.getLatitude();
-				double longitude = location.getLongitude();
-				Log.i(TAG, "Longitude=["+longitude+"] latitude=["+latitude+"]");
+//				List<Photo> list = getPhotosFromExactLocation(location);
+				List<Photo> list = getPhotosFromNearLocation(location);
 				
-				//Random no. between 0.1 > 0.0099
-				double d = randomWheel.nextDouble();
-				d = Double.valueOf(df.format((d * (0.1 - 0.0099))));
-				Log.i(TAG, "latitude =" + (df.format( latitude + d)));
+				Map<String, Object> photoSpecs = selectFirstGoodPhoto(list);
+				Log.i(TAG, "Photo retireved from  1st request service looks like this: url[" + list.toString());
 				
-				//Add random to ensure varying results
-				f.with("lat","" + df.format( latitude + d));
-				f.with("lon", "" + df.format( longitude + d));
-				f.with("accuracy", "16");
-				f.with("tags",	getHumanizeDate(new GregorianCalendar().get(Calendar.HOUR_OF_DAY)));
-				f.with("sort", "interestingness-desc");
-				f.with("media", "photos");
-				f.with("extras", "url_o");
-				f.with("per_page", "1");
-				f.with("page", ""+ randomWheel.nextInt(5));
-				List<Photo> list = f.fetchStructuredDataList();
-
-				if (list.size() < 1) {
-					f.remove("accuracy", "16");
-					f.with("accuracy", "11");
-				}
-
-				for (Photo p : list) {
-					if (p.getUrl_o() != null) {
-						photo = p;
-						break;
-					}
-				}
-
-				if (photo != null) {
-					cachedBitmap = refreshCachedImage();
+				if (photoSpecs != null) {
+					cachedBitmap = refreshCachedImage(photoSpecs);
 				}
 			}
 		}
 
-		private Bitmap refreshCachedImage() {
-			Bitmap original=null;
-			try {
-				original = photo.getPhoto();
-			} catch (IOException e) {
-				e.printStackTrace();
+		private Map<String, Object> selectFirstGoodPhoto(List<Photo> photos) {
+			Map<String, Object> m = new HashMap<String, Object>();
+			
+			for (Photo p : photos) {
+				if (p.hiResImg_url != null) {
+					m.put("height", p.hiResImg_height);
+					m.put("width", p.hiResImg_width);
+					m.put("url", p.hiResImg_url);
+					break;
+				}
+				
+				if(p.medResImg_url !=null){
+					m.put("height", p.medResImg_height);
+					m.put("width", p.medResImg_width);
+					m.put("url", p.medResImg_url);
+					break;
+				}
+				
+				if(p.smallResImg_url !=null){
+					m.put("height", p.smallResImg_height);
+					m.put("width", p.smallResImg_width);
+					m.put("url", p.smallResImg_url);
+					break;
+				}
+			}
+			return m;
+		}
+
+		private List<Photo> getPhotosFromNearLocation(Location location) {
+			Log.d(TAG, "Requesting photo details based on approximate location");
+			String place= geoNamesAPI.getNearestPlaceName(df.format( location.getLatitude()), df.format( location.getLongitude()));
+			
+			//Add random to ensure varying results
+			photoSearch.with("accuracy", "11");
+			photoSearch.with("tags",	place);
+			photoSearch.with("sort", "interestingness-desc");
+			photoSearch.with("media", "photos");
+			photoSearch.with("extras", "url_m");
+			photoSearch.with("extras", "url_o");
+			photoSearch.with("extras", "url_s");
+			photoSearch.with("per_page", "4");
+			
+			List<Photo> list = photoSearch.fetchStructuredDataList();
+			
+			for (int i=0; i < list.size(); i++) {
+				Log.i(TAG, "Photo in list= " + list.get(i).toString());
 			}
 			
-			if (original != null) {
-				return scaleImage(original, displayWidth, displayHeight);
-			}else{
-				return null;
+			return list;
+		}
+		
+		private List<Photo> getPhotosFromExactLocation(Location location) {
+			Log.d(TAG, "Requesting photo details based on exact location");
+			final Flickr<Photo> photoSearch = new PhotoSearch();
+			
+			double latitude = location.getLatitude();
+			double longitude = location.getLongitude();
+			
+			//Random no. between 0.1 > 0.0099
+			double d = randomWheel.nextDouble();
+			d = Double.valueOf(df.format((d * (0.1 - 0.0099))));
+			
+			Log.i(TAG, "Original Longitude=["+longitude+"] latitude=["+latitude+"]");
+			Log.i(TAG, "Ammended Longitude=["+(df.format( longitude + d))+"] latitude=["+(df.format( latitude + d))+"]");
+			//Add random to ensure varying results
+			
+			photoSearch.with("lat","" + df.format( latitude + d));
+			photoSearch.with("lon", "" + df.format( longitude + d));
+			photoSearch.with("accuracy", "1");
+			photoSearch.with("tags",	getHumanizeDate(new GregorianCalendar().get(Calendar.HOUR_OF_DAY)));
+			photoSearch.with("sort", "interestingness-desc");
+			photoSearch.with("media", "photos");
+			photoSearch.with("extras", "url_m");
+			photoSearch.with("per_page", "1");
+//				f.with("page", ""+ randomWheel.nextInt(5));
+			List<Photo> list = photoSearch.fetchStructuredDataList();
+			
+			if (list.size() < 1) {
+				photoSearch.remove("accuracy", "16");
+				photoSearch.with("accuracy", "11");
 			}
+			
+			for (int i=0; i < list.size(); i++) {
+				Log.i(TAG, "Photo in list= " + list.get(i).toString());
+			}
+			
+			return list;
+		}
+
+		private Bitmap refreshCachedImage(Map<String, Object> photoSpecs) {
+			Bitmap original= null;
+			URL photoUrl = null;
+			
+			 try {
+				 photoUrl = new URL((String) photoSpecs.get("url"));
+			 } catch (MalformedURLException error) {
+					 error.printStackTrace();
+			 }
+
+			 try {
+				 HttpURLConnection connection = (HttpURLConnection)photoUrl.openConnection();
+				 connection.setDoInput(true);
+				 connection.connect();
+				 InputStream input = connection.getInputStream();
+				 original = BitmapFactory.decodeStream(input);
+			 } catch (IOException e) {
+				 e.printStackTrace();
+			 }
+			
+			if (original != null) {
+				Log.i(TAG, "Original is not null");
+				original= scaleImage(original, displayWidth, displayHeight);
+			}else{
+				Log.i(TAG, "Original is null");
+			}
+			
+			return original;
 		}
 
 		/**
@@ -222,7 +311,7 @@ public class FlickrService extends WallpaperService {
 
 			final float scale;
 			
-			if(alignImgInMiddle ){
+			if(alignImgInMiddle){
 				scale = Math.min((float) width / (float) bitmapWidth, (float) height / (float) bitmapHeight);
 			}else{
 				scale = Math.max((float) width / (float) bitmapWidth, (float) height / (float) bitmapHeight);
@@ -236,12 +325,15 @@ public class FlickrService extends WallpaperService {
 			
 			/*
 			 * Work out the Top Margin to align the image in the middle of the screen
+			 * with a slightly larger bottom gutter for framing
 			 * screenDivisions = totalScreenHeight/BitmapHeight
-			 * cachedTopMargin = (screenDivisions * 0.5) + (BitmapHeight*0.5)
+			 * cachedTopMargin = screenDivisions - (BitmapHeight*0.5)
 			 * 
 			 */
 			if(alignImgInMiddle){
-				cachedTopMargin = Math.round(((float)(Math.min((float)displayHeight, (float)scaledHeight)) *0.5)+ ((float)scaledHeight*0.5)); 
+				final float screenDividedByPic = Math.min((float)displayHeight, (float)scaledHeight);
+				cachedTopMargin = Math.round((screenDividedByPic - (float)scaledHeight*0.5));
+				Log.i(TAG, "Rounded = " + cachedTopMargin);
 			}else{
 				cachedTopMargin = 0;
 			}

@@ -8,7 +8,10 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.util.Log;
 import android.util.Pair;
 
@@ -73,4 +76,5 @@ public abstract class Flickr<T> {
 		Log.d(TAG, "Calling Flickr API with URL [" + builder.toString()+"]");
 		return builder.toString();
 	}
+	
 }
