@@ -8,20 +8,12 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.util.Log;
 import android.util.Pair;
 
 @SuppressWarnings("unchecked")
 public abstract class Flickr<T> {
-
-	private static final String TAG = Flickr.class.getSimpleName();
-	private final String URL = "http://api.flickr.com/services/rest/";
-	private String api = "655ba9dc4418959a43a9c37aa4acea49";
-	private List<Pair> arguments = new ArrayList<Pair>();
 
 	public InputStream getContent() throws MalformedURLException, IOException {
 		if (api == null || api.equals("")) {
@@ -43,23 +35,15 @@ public abstract class Flickr<T> {
 		arguments.add(pair);
 		return this;
 	}
-	
-	public Flickr<T> remove(String key, String value) {
-		arguments.remove(new Pair<String, String>(key, value));
-		return this;
-	}
-	
+
 	public Flickr<T> with(String key, String value) {
 		return with(new Pair<String, String>(key, value));
 	}
 
-	public List<Pair> getArguments() {
-		return arguments;
-	};
-
-	public abstract List<T> fetchStructuredDataList();
-
-	public abstract String getMethod();
+	public Flickr<T> remove(String key, String value) {
+		arguments.remove(new Pair<String, String>(key, value));
+		return this;
+	}
 
 	public String constructUrl(List<Pair> list) {
 		if (list == null || list.size() == 0)
@@ -73,8 +57,21 @@ public abstract class Flickr<T> {
 					p.second.toString()).append('&');
 		}
 		builder.deleteCharAt(builder.length() - 1);
-		Log.d(TAG, "Calling Flickr API with URL [" + builder.toString()+"]");
+		Log.d(TAG, "Calling Flickr API with URL [" + builder.toString() + "]");
 		return builder.toString();
 	}
-	
+
+	public List<Pair> getArguments() {
+		return arguments;
+	}
+
+	public abstract List<T> fetchStructuredDataList();
+
+	public abstract String getMethod();
+
+	private static final String TAG = Flickr.class.getSimpleName();
+	private final String URL = "http://api.flickr.com/services/rest/";
+	private String api = "655ba9dc4418959a43a9c37aa4acea49";
+	private List<Pair> arguments = new ArrayList<Pair>();
+
 }
