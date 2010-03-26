@@ -6,6 +6,7 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -201,8 +202,7 @@ public class FlickrService extends WallpaperService {
 			final float scale;
 		
 			if (alignImgInMiddle) {
-				scale = Math.min((float) width / (float) bitmapWidth,
-						(float) height / (float) bitmapHeight);
+					scale = Math.min((float) width / (float) bitmapWidth, (float) height / (float) bitmapHeight);
 			} else {
 				scale = Math.max((float) width / (float) bitmapWidth,
 						(float) height / (float) bitmapHeight);
@@ -250,33 +250,44 @@ public class FlickrService extends WallpaperService {
 			return location;
 		}
 
-		private PhotoSpec<String, Object> getBestSpecs(
-				List<Photo> photos) {
+		private PhotoSpec<String, Object> getBestSpecs(List<Photo> photos) {
+			Log.i(TAG, "Choosing a photo from amoungst those with URLs");
 			PhotoSpec<String, Object> spec = new PhotoSpec<String, Object>();
-
+			List<PhotoSpec<String, Object>> options = new ArrayList<PhotoSpec<String, Object>>();
 			for (Photo p : photos) {
 				if (p.hiResImg_url != null) {
 					spec.put(PhotoSpec.PHOTOSPEC_HEIGHT, p.hiResImg_height);
 					spec.put(PhotoSpec.PHOTOSPEC_WIDTH, p.hiResImg_width);
 					spec.put(PhotoSpec.PHOTOSPEC_URL, p.hiResImg_url);
-					break;
+					options.add(spec);
+					spec = new PhotoSpec<String, Object>();
 				}
 
 				if (p.medResImg_url != null) {
 					spec.put(PhotoSpec.PHOTOSPEC_HEIGHT, p.medResImg_height);
 					spec.put(PhotoSpec.PHOTOSPEC_WIDTH, p.medResImg_width);
 					spec.put(PhotoSpec.PHOTOSPEC_URL, p.medResImg_url);
-					break;
+					options.add(spec);
+					spec = new PhotoSpec<String, Object>();
 				}
 
 				if (p.smallResImg_url != null) {
 					spec.put(PhotoSpec.PHOTOSPEC_HEIGHT, p.smallResImg_height);
 					spec.put(PhotoSpec.PHOTOSPEC_WIDTH, p.smallResImg_width);
 					spec.put(PhotoSpec.PHOTOSPEC_URL, p.smallResImg_url);
-					break;
+					options.add(spec);
+					spec = new PhotoSpec<String, Object>();
 				}
 			}
-			return spec;
+			
+			int opts = options.size();
+			if(opts>1){
+				Log.i(TAG, "Options ="+opts);
+				opts=randomWheel.nextInt(opts-1);
+				return options.get(opts);
+			}
+			
+			return options.get(0);
 		}
 
 		private List<Photo> getPhotosFromSurrounding(Location location) {
@@ -294,9 +305,20 @@ public class FlickrService extends WallpaperService {
 			photoSearch.with("extras", "url_m");
 			photoSearch.with("extras", "url_o");
 			photoSearch.with("extras", "url_s");
-			photoSearch.with("per_page", "4");
-
+			photoSearch.with("per_page", "50");
 			List<Photo> list = photoSearch.fetchStructuredDataList();
+			
+			
+			if(list.size()>1){
+				Log.i(TAG, "Size = "+ list.size());
+				int square = (int)Math.sqrt(list.size());
+				Log.i(TAG, "lowest divider possible= "+ square);
+				
+				photoSearch.with("per_page", ""+square);
+				photoSearch.with("page", ""+ randomWheel.nextInt(square-1));
+				list = photoSearch.fetchStructuredDataList();
+			}
+			
 
 			for (int i = 0; i < list.size(); i++) {
 				Log.i(TAG, "Photo in list= " + list.get(i).toString());
