@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import junit.framework.TestCase;
-import novoda.wallpaper.flickr.Flickr;
+import novoda.net.Flickr;
 import novoda.wallpaper.flickr.Photo;
 import android.util.Pair;
 

@@ -10,11 +10,10 @@ import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
+import novoda.net.Flickr;
 import novoda.net.GeoNamesAPI;
-import novoda.wallpaper.flickr.Flickr;
 import novoda.wallpaper.flickr.Photo;
 import novoda.wallpaper.flickr.PhotoSearch;
 import android.app.WallpaperManager;
@@ -37,9 +36,6 @@ import android.view.SurfaceHolder;
 import android.view.WindowManager;
 
 public class FlickrService extends WallpaperService {
-
-	public static final String TAG = FlickrService.class.getSimpleName();
-	public static final String SHARED_PREFS_NAME = "flickrSettings";
 
 	@Override
 	public Engine onCreateEngine() {
@@ -94,8 +90,9 @@ public class FlickrService extends WallpaperService {
 
 		@Override
 		public void onDestroy() {
-			if (cachedBitmap != null)
+			if (cachedBitmap != null){
 				cachedBitmap.recycle();
+			}
 			photo = null;
 			cachedBitmap = null;
 			mHandler.removeCallbacks(mDrawWallpaper);
@@ -122,8 +119,8 @@ public class FlickrService extends WallpaperService {
 
 		}
 
-		private void drawFrame() {
-			Log.d(TAG, "Drawing Image");
+		private void drawCanvas() {
+			Log.d(TAG, "Drawing Canvas");
 			final SurfaceHolder holder = getSurfaceHolder();
 			Canvas c = null;
 			try {
@@ -137,30 +134,18 @@ public class FlickrService extends WallpaperService {
 			}
 		}
 
-		private void getPhoto() {
-			Log.d(TAG, "getPhoto called to retrieve image from FlickrAPI");
-
-			final LocationManager locManager = (LocationManager) FlickrService.this
-					.getBaseContext()
-					.getSystemService(Context.LOCATION_SERVICE);
-
-			Location location = null;
-			for (String provider : locManager.getProviders(true)) {
-				location = locManager.getLastKnownLocation(provider);
-				if (location != null)
-					break;
-			}
+		private void refreshImage() {
+			Location location = getRecentLocation();
 
 			if (location == null) {
 				// no location
 			} else {
 				// List<Photo> list = getPhotosFromExactLocation(location);
-				List<Photo> list = getPhotosFromNearLocation(location);
-
-				Map<String, Object> photoSpecs = selectFirstGoodPhoto(list);
-				Log.i(TAG,
+				List<Photo> photos = getPhotosFromSurrounding(location);
+				PhotoSpec<String, Object> photoSpecs = getBestSpecs(photos);
+				Log.d(TAG,
 						"Photo retireved from  1st request service looks like this: url["
-								+ list.toString());
+								+ photos.toString());
 
 				if (photoSpecs != null) {
 					cachedBitmap = refreshCachedImage(photoSpecs);
@@ -168,35 +153,133 @@ public class FlickrService extends WallpaperService {
 			}
 		}
 
-		private Map<String, Object> selectFirstGoodPhoto(List<Photo> photos) {
-			Map<String, Object> m = new HashMap<String, Object>();
+		private Bitmap refreshCachedImage(PhotoSpec<String, Object> photoSpecs) {
+			Bitmap original = null;
+			URL photoUrl = null;
+		
+			try {
+				photoUrl = new URL((String) photoSpecs
+						.get(PhotoSpec.PHOTOSPEC_URL));
+			} catch (MalformedURLException error) {
+				error.printStackTrace();
+			}
+		
+			try {
+				HttpURLConnection connection = (HttpURLConnection) photoUrl
+						.openConnection();
+				connection.setDoInput(true);
+				connection.connect();
+				InputStream input = connection.getInputStream();
+				original = BitmapFactory.decodeStream(input);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		
+			if (original != null) {
+				Log.i(TAG, "Original is not null");
+				original = scaleImage(original, displayWidth, displayHeight);
+			} else {
+				Log.i(TAG, "Original is null");
+			}
+		
+			return original;
+		}
+
+		/**
+		 * Should scale the bitmap to fit the height/width of the drawing
+		 * canvas.
+		 * 
+		 * @param bitmap
+		 * @param width
+		 * @param height
+		 * @return
+		 */
+		Bitmap scaleImage(Bitmap bitmap, int width, int height) {
+			final int bitmapWidth = bitmap.getWidth();
+			final int bitmapHeight = bitmap.getHeight();
+		
+			final float scale;
+		
+			if (alignImgInMiddle) {
+				scale = Math.min((float) width / (float) bitmapWidth,
+						(float) height / (float) bitmapHeight);
+			} else {
+				scale = Math.max((float) width / (float) bitmapWidth,
+						(float) height / (float) bitmapHeight);
+			}
+		
+			final int scaledWidth = (int) (bitmapWidth * scale);
+			final int scaledHeight = (int) (bitmapHeight * scale);
+		
+			Log.d(TAG, "Scaling Bitmap (height x width): Orginal["
+					+ bitmapHeight + "x" + bitmapWidth + "], New["
+					+ scaledHeight + "x" + scaledWidth + "]");
+			Bitmap createScaledBitmap = Bitmap.createScaledBitmap(bitmap,
+					scaledWidth, scaledHeight, true);
+		
+			/*
+			 * Work out the Top Margin to align the image in the middle of the
+			 * screen with a slightly larger bottom gutter for framing
+			 * screenDivisions = totalScreenHeight/BitmapHeight cachedTopMargin
+			 * = screenDivisions - (BitmapHeight*0.5)
+			 */
+			if (alignImgInMiddle) {
+				final float screenDividedByPic = Math.min(
+						(float) displayHeight, (float) scaledHeight);
+				cachedTopMargin = Math
+						.round((screenDividedByPic - (float) scaledHeight * 0.5));
+				Log.i(TAG, "Rounded = " + cachedTopMargin);
+			} else {
+				cachedTopMargin = 0;
+			}
+		
+			return createScaledBitmap;
+		}
+
+		private Location getRecentLocation() {
+			final LocationManager locManager = (LocationManager) FlickrService.this
+			.getBaseContext()
+			.getSystemService(Context.LOCATION_SERVICE);
+			Location location =null;
+			for (String provider : locManager.getProviders(true)) {
+				location = locManager.getLastKnownLocation(provider);
+				if (location != null){
+					break;
+				}
+			}
+			return location;
+		}
+
+		private PhotoSpec<String, Object> getBestSpecs(
+				List<Photo> photos) {
+			PhotoSpec<String, Object> spec = new PhotoSpec<String, Object>();
 
 			for (Photo p : photos) {
 				if (p.hiResImg_url != null) {
-					m.put("height", p.hiResImg_height);
-					m.put("width", p.hiResImg_width);
-					m.put("url", p.hiResImg_url);
+					spec.put(PhotoSpec.PHOTOSPEC_HEIGHT, p.hiResImg_height);
+					spec.put(PhotoSpec.PHOTOSPEC_WIDTH, p.hiResImg_width);
+					spec.put(PhotoSpec.PHOTOSPEC_URL, p.hiResImg_url);
 					break;
 				}
 
 				if (p.medResImg_url != null) {
-					m.put("height", p.medResImg_height);
-					m.put("width", p.medResImg_width);
-					m.put("url", p.medResImg_url);
+					spec.put(PhotoSpec.PHOTOSPEC_HEIGHT, p.medResImg_height);
+					spec.put(PhotoSpec.PHOTOSPEC_WIDTH, p.medResImg_width);
+					spec.put(PhotoSpec.PHOTOSPEC_URL, p.medResImg_url);
 					break;
 				}
 
 				if (p.smallResImg_url != null) {
-					m.put("height", p.smallResImg_height);
-					m.put("width", p.smallResImg_width);
-					m.put("url", p.smallResImg_url);
+					spec.put(PhotoSpec.PHOTOSPEC_HEIGHT, p.smallResImg_height);
+					spec.put(PhotoSpec.PHOTOSPEC_WIDTH, p.smallResImg_width);
+					spec.put(PhotoSpec.PHOTOSPEC_URL, p.smallResImg_url);
 					break;
 				}
 			}
-			return m;
+			return spec;
 		}
 
-		private List<Photo> getPhotosFromNearLocation(Location location) {
+		private List<Photo> getPhotosFromSurrounding(Location location) {
 			Log
 					.d(TAG,
 							"Requesting photo details based on approximate location");
@@ -263,88 +346,6 @@ public class FlickrService extends WallpaperService {
 			return list;
 		}
 
-		private Bitmap refreshCachedImage(Map<String, Object> photoSpecs) {
-			Bitmap original = null;
-			URL photoUrl = null;
-
-			try {
-				photoUrl = new URL((String) photoSpecs.get("url"));
-			} catch (MalformedURLException error) {
-				error.printStackTrace();
-			}
-
-			try {
-				HttpURLConnection connection = (HttpURLConnection) photoUrl
-						.openConnection();
-				connection.setDoInput(true);
-				connection.connect();
-				InputStream input = connection.getInputStream();
-				original = BitmapFactory.decodeStream(input);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-
-			if (original != null) {
-				Log.i(TAG, "Original is not null");
-				original = scaleImage(original, displayWidth, displayHeight);
-			} else {
-				Log.i(TAG, "Original is null");
-			}
-
-			return original;
-		}
-
-		/**
-		 * Should scale the bitmap to fit the height/width of the drawing
-		 * canvas.
-		 * 
-		 * @param bitmap
-		 * @param width
-		 * @param height
-		 * @return
-		 */
-		Bitmap scaleImage(Bitmap bitmap, int width, int height) {
-			final int bitmapWidth = bitmap.getWidth();
-			final int bitmapHeight = bitmap.getHeight();
-
-			final float scale;
-
-			if (alignImgInMiddle) {
-				scale = Math.min((float) width / (float) bitmapWidth,
-						(float) height / (float) bitmapHeight);
-			} else {
-				scale = Math.max((float) width / (float) bitmapWidth,
-						(float) height / (float) bitmapHeight);
-			}
-
-			final int scaledWidth = (int) (bitmapWidth * scale);
-			final int scaledHeight = (int) (bitmapHeight * scale);
-
-			Log.d(TAG, "Scaling Bitmap (height x width): Orginal["
-					+ bitmapHeight + "x" + bitmapWidth + "], New["
-					+ scaledHeight + "x" + scaledWidth + "]");
-			Bitmap createScaledBitmap = Bitmap.createScaledBitmap(bitmap,
-					scaledWidth, scaledHeight, true);
-
-			/*
-			 * Work out the Top Margin to align the image in the middle of the
-			 * screen with a slightly larger bottom gutter for framing
-			 * screenDivisions = totalScreenHeight/BitmapHeight cachedTopMargin
-			 * = screenDivisions - (BitmapHeight*0.5)
-			 */
-			if (alignImgInMiddle) {
-				final float screenDividedByPic = Math.min(
-						(float) displayHeight, (float) scaledHeight);
-				cachedTopMargin = Math
-						.round((screenDividedByPic - (float) scaledHeight * 0.5));
-				Log.i(TAG, "Rounded = " + cachedTopMargin);
-			} else {
-				cachedTopMargin = 0;
-			}
-
-			return createScaledBitmap;
-		}
-
 		/**
 		 * Returns a human readable tag which will be used with the search
 		 * query.
@@ -385,14 +386,31 @@ public class FlickrService extends WallpaperService {
 		private final Runnable mDrawWallpaper = new Runnable() {
 			public void run() {
 				if (currentlyVisibile) {
-					getPhoto();
-					drawFrame();
+					refreshImage();
+					drawCanvas();
 				} else {
 					// Waiting until wallpaper becomes visible
 					mHandler.postDelayed(mDrawWallpaper, 600);
 				}
 			}
 		};
+
+		/*
+		 * This class exists just to save the essentials of what is needed to
+		 * deal with images being requested and cached.
+		 */
+		@SuppressWarnings("hiding")
+		private class PhotoSpec<String, Object> extends HashMap<String, Object> {
+
+			private static final long serialVersionUID = 1L;
+
+			public final static java.lang.String PHOTOSPEC_URL = "url";
+
+			public final static java.lang.String PHOTOSPEC_WIDTH = "width";
+
+			public final static java.lang.String PHOTOSPEC_HEIGHT = "height";
+
+		}
 
 		private final Handler mHandler = new Handler();
 
@@ -429,4 +447,7 @@ public class FlickrService extends WallpaperService {
 		private PhotoSearch photoSearch = new PhotoSearch();
 
 	}
+
+	public static final String TAG = FlickrService.class.getSimpleName();
+	public static final String SHARED_PREFS_NAME = "flickrSettings";
 }

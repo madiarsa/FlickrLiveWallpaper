@@ -1,4 +1,4 @@
-package novoda.wallpaper.flickr;
+package novoda.net;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -16,7 +16,7 @@ import android.util.Pair;
 public abstract class Flickr<T> {
 
 	public InputStream getContent() throws MalformedURLException, IOException {
-		if (api == null || api.equals("")) {
+		if (API_KEY == null || API_KEY.equals("")) {
 			throw new MalformedURLException("An API is needed");
 		}
 
@@ -47,11 +47,11 @@ public abstract class Flickr<T> {
 
 	public String constructUrl(List<Pair> list) {
 		if (list == null || list.size() == 0)
-			return URL;
+			return API_ENDPOINT_URL;
 
-		StringBuilder builder = new StringBuilder(URL);
+		StringBuilder builder = new StringBuilder(API_ENDPOINT_URL);
 		builder.append('?').append("method=").append(getMethod()).append('&')
-				.append("api_key=").append(api).append('&');
+				.append("api_key=").append(API_KEY).append('&');
 		for (Pair p : list) {
 			builder.append(p.first.toString()).append('=').append(
 					p.second.toString()).append('&');
@@ -69,9 +69,9 @@ public abstract class Flickr<T> {
 
 	public abstract String getMethod();
 
-	private static final String TAG = Flickr.class.getSimpleName();
-	private final String URL = "http://api.flickr.com/services/rest/";
-	private String api = "655ba9dc4418959a43a9c37aa4acea49";
+	private static final String API_ENDPOINT_URL = "http://api.flickr.com/services/rest/";
+	private static final String API_KEY = "655ba9dc4418959a43a9c37aa4acea49";
 	private List<Pair> arguments = new ArrayList<Pair>();
+	private static final String TAG = Flickr.class.getSimpleName();
 
 }
