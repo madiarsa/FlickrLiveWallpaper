@@ -4,5 +4,5 @@
 	xmlns:android="http://schemas.android.com/apk/res/android"
 	android:settingsActivity="novoda.wallpaper.FlickrSettings"	
 	android:author="@string/author"
-	android:thumbnail="@drawable/flickr"
+	android:thumbnail="@drawable/ic_logo_flickr"
 	android:description="@string/description"  />
