@@ -161,7 +161,10 @@ public class FlickrService extends WallpaperService {
 			}
 		}
 
-		private void requestAndCacheImage(Location location, String placeName) {
+		private void requestAndCacheImage(Location location, String placeName) throws IllegalStateException{
+			if (cachedBitmap != null) {
+				cachedBitmap.recycle();
+			}
 			// List<Photo> list = getPhotosFromExactLocation(location);
 			List<Photo> photos = getPhotosFromApproxLocation(placeName,
 					location);
@@ -192,11 +195,14 @@ public class FlickrService extends WallpaperService {
 		 * Flickr API, request the binary stream from a HTTP connection
 		 */
 		private Bitmap retrievePhotoFromSpecs(
-				PhotoSpec<String, Object> photoSpecs) {
+				PhotoSpec<String, Object> photoSpecs) throws IllegalStateException{
 			Bitmap original = null;
 			URL photoUrl = null;
 
 			try {
+				Log.d(TAG, "Requesting static image from Flickr=["
+						+ (String) photoSpecs.get(PhotoSpec.PHOTOSPEC_URL)
+						+ "]");
 				photoUrl = new URL((String) photoSpecs
 						.get(PhotoSpec.PHOTOSPEC_URL));
 			} catch (MalformedURLException error) {
@@ -214,10 +220,11 @@ public class FlickrService extends WallpaperService {
 				e.printStackTrace();
 			}
 
-			if (original != null) {
-				original = scaleImage(original, displayWidth, displayHeight);
+			if (original == null) {
+				Log.e(TAG, "I'm not sure what went wrong but image coul not be retrieved");
+				throw new IllegalStateException("Whoops! We had problems retrieving an image. Please try again.");
 			} else {
-				Log.e(TAG, "Image returned from Service was null");
+				original = scaleImage(original, displayWidth, displayHeight);
 			}
 
 			return original;
@@ -232,9 +239,9 @@ public class FlickrService extends WallpaperService {
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
-
+				c.drawColor(Color.BLACK);
 				if (c != null && cachedBitmap != null) {
-					c.drawColor(0, Mode.CLEAR);
+					c.drawColor(0, Mode.DST_ATOP);
 					c.drawBitmap(cachedBitmap, 0, cachedTopMargin, txtPaint);
 				}
 			} finally {
@@ -291,7 +298,7 @@ public class FlickrService extends WallpaperService {
 		}
 
 		/*
-		 * Initial loading feedback
+		 * Initial loading feedback Also clears the screen of any old artifacts
 		 */
 		private void drawInitialNotification() {
 			Log.d(TAG, "Displaying loading info");
@@ -301,6 +308,7 @@ public class FlickrService extends WallpaperService {
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
+				c.drawColor(Color.BLACK);
 				final Bitmap decodeResource = BitmapFactory.decodeResource(
 						getResources(), getResources().getIdentifier(
 								"ic_logo_flickr", "drawable",
@@ -332,6 +340,7 @@ public class FlickrService extends WallpaperService {
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
+				c.drawColor(Color.BLACK);
 				final Bitmap decodeResource = BitmapFactory.decodeResource(
 						getResources(), getResources().getIdentifier(
 								"ic_logo_flickr", "drawable",
@@ -351,6 +360,10 @@ public class FlickrService extends WallpaperService {
 			}
 		}
 
+		/*
+		 * Provides error feedback for users Also clears the screen of any old
+		 * artifacts
+		 */
 		private void drawErrorNotification(String error) {
 			Log.e(TAG, error);
 			float x = displayMiddleX;
@@ -359,16 +372,17 @@ public class FlickrService extends WallpaperService {
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
+				c.drawColor(Color.BLACK);
 				final Bitmap decodeResource = BitmapFactory.decodeResource(
 						getResources(), getResources().getIdentifier(
 								"ic_smile_sad_48", "drawable",
 								"novoda.wallpaper"));
 				if (c != null) {
+
 					c
 							.drawBitmap(decodeResource, (x - decodeResource
 									.getWidth() * 0.5f), y, txtPaint);
-					drawTextInRect(c, txtPaint, new Rect((int) x, (int) y + 80,
-							700, 300), error);
+					drawTextInRect(c, txtPaint, new Rect((int) x, (int) y + 108,	700, 300), error);
 				}
 			} finally {
 				if (c != null)
@@ -631,8 +645,15 @@ public class FlickrService extends WallpaperService {
 
 					if (location != null) {
 						drawDetailedLoadingNotification(location.second);
-						requestAndCacheImage(location.first, location.second);
-						drawCachedImage();
+
+						try{
+							requestAndCacheImage(location.first, location.second);
+							drawCachedImage();
+						} catch (IllegalStateException e) {
+							Log.e(TAG, e.getMessage());
+							drawErrorNotification(e.getMessage());
+						}
+						
 					}
 
 				} else {
