@@ -94,17 +94,20 @@ public class FlickrService extends WallpaperService {
 					.getAssets(), "fonts/ArnoProRegular10pt.otf");
 			txtPaint.setTypeface(typeFace);
 			txtPaint.setTextAlign(Paint.Align.CENTER);
-			
-			final Bitmap decodeResource = BitmapFactory.decodeResource(
-					getResources(), getResources().getIdentifier(
-							"bg_wallpaper_pattern", "drawable",
-					"novoda.wallpaper"));
-			
-			BitmapShader mShader1 = new BitmapShader(decodeResource, Shader.TileMode.REPEAT,
-                    Shader.TileMode.REPEAT);
+
+			final Bitmap bg = BitmapFactory.decodeResource(getResources(),
+					getResources().getIdentifier("bg_wallpaper_pattern",
+							"drawable", "novoda.wallpaper"));
+
+			BitmapShader mShader1 = new BitmapShader(bg,
+					Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
+			bg.recycle();
 			bgPaint = new Paint();
 			bgPaint.setShader(mShader1);
 
+			frame = BitmapFactory.decodeResource(getResources(),
+					getResources().getIdentifier("frame", "drawable",
+							"novoda.wallpaper"));
 		}
 
 		@Override
@@ -173,7 +176,8 @@ public class FlickrService extends WallpaperService {
 			}
 		}
 
-		private void requestAndCacheImage(Location location, String placeName) throws IllegalStateException{
+		private void requestAndCacheImage(Location location, String placeName)
+				throws IllegalStateException {
 			if (cachedBitmap != null) {
 				cachedBitmap.recycle();
 			}
@@ -207,7 +211,8 @@ public class FlickrService extends WallpaperService {
 		 * Flickr API, request the binary stream from a HTTP connection
 		 */
 		private Bitmap retrievePhotoFromSpecs(
-				PhotoSpec<String, Object> photoSpecs) throws IllegalStateException{
+				PhotoSpec<String, Object> photoSpecs)
+				throws IllegalStateException {
 			Bitmap original = null;
 			URL photoUrl = null;
 
@@ -233,8 +238,11 @@ public class FlickrService extends WallpaperService {
 			}
 
 			if (original == null) {
-				Log.e(TAG, "I'm not sure what went wrong but image coul not be retrieved");
-				throw new IllegalStateException("Whoops! We had problems retrieving an image. Please try again.");
+				Log
+						.e(TAG,
+								"I'm not sure what went wrong but image coul not be retrieved");
+				throw new IllegalStateException(
+						"Whoops! We had problems retrieving an image. Please try again.");
 			} else {
 				original = scaleImage(original, displayWidth, displayHeight);
 			}
@@ -253,7 +261,8 @@ public class FlickrService extends WallpaperService {
 				c = holder.lockCanvas();
 				if (c != null && cachedBitmap != null) {
 					c.drawPaint(bgPaint);
-					c.drawBitmap(cachedBitmap, 0, cachedTopMargin, txtPaint);
+					c.drawBitmap(frame, 45, 180, new Paint());
+					c.drawBitmap(cachedBitmap, FRAMED_IMG_LEFT_MARGIN, FRAMED_IMG_TOP_MARGIN, txtPaint);
 				}
 			} finally {
 				if (c != null)
@@ -274,17 +283,21 @@ public class FlickrService extends WallpaperService {
 			final int bitmapHeight = bitmap.getHeight();
 			final float scale;
 
-			if (alignImgInMiddle) {
-				scale = Math.min((float) width / (float) bitmapWidth,
-						(float) height / (float) bitmapHeight);
-			} else {
-				scale = Math.max((float) width / (float) bitmapWidth,
-						(float) height / (float) bitmapHeight);
-			}
+//			if (alignImgInMiddle) {
+//				scale = Math.min((float) width / (float) bitmapWidth,
+//						(float) height / (float) bitmapHeight);
+//			} else {
+//				scale = Math.max((float) width / (float) bitmapWidth,
+//						(float) height / (float) bitmapHeight);
+//			}
+//
+//			final int scaledWidth = (int) (bitmapWidth * scale);
+//			final int scaledHeight = (int) (bitmapHeight * scale);
+			
+			final int scaledWidth = 318;
+			final int scaledHeight = 251;
 
-			final int scaledWidth = (int) (bitmapWidth * scale);
-			final int scaledHeight = (int) (bitmapHeight * scale);
-
+			
 			/*
 			 * Work out the Top Margin to align the image in the middle of the
 			 * screen with a slightly larger bottom gutter for framing
@@ -294,10 +307,10 @@ public class FlickrService extends WallpaperService {
 			if (alignImgInMiddle) {
 				final float screenDividedByPic = Math.min(
 						(float) displayHeight, (float) scaledHeight);
-				cachedTopMargin = Math
+				cachedImgTopMargin = Math
 						.round((screenDividedByPic - (float) scaledHeight * 0.5));
 			} else {
-				cachedTopMargin = 0;
+				cachedImgTopMargin = 0;
 			}
 
 			Log.d(TAG, "Scaling Bitmap (height x width): Orginal["
@@ -307,7 +320,7 @@ public class FlickrService extends WallpaperService {
 			return Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight,
 					true);
 		}
-		
+
 		/*
 		 * Initial loading feedback Also clears the screen of any old artifacts
 		 */
@@ -335,7 +348,7 @@ public class FlickrService extends WallpaperService {
 					holder.unlockCanvasAndPost(c);
 			}
 		}
-		
+
 		/*
 		 * Draw Background
 		 */
@@ -347,9 +360,10 @@ public class FlickrService extends WallpaperService {
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
-				
+
 				if (c != null) {
-		            c.drawPaint(bgPaint);
+					c.drawPaint(bgPaint);
+
 				}
 			} finally {
 				if (c != null)
@@ -414,7 +428,8 @@ public class FlickrService extends WallpaperService {
 					c
 							.drawBitmap(decodeResource, (x - decodeResource
 									.getWidth() * 0.5f), y, txtPaint);
-					drawTextInRect(c, txtPaint, new Rect((int) x, (int) y + 108,	700, 300), error);
+					drawTextInRect(c, txtPaint, new Rect((int) x,
+							(int) y + 108, 700, 300), error);
 				}
 			} finally {
 				if (c != null)
@@ -678,14 +693,15 @@ public class FlickrService extends WallpaperService {
 					if (location != null) {
 						drawDetailedLoadingNotification(location.second);
 
-						try{
-							requestAndCacheImage(location.first, location.second);
+						try {
+							requestAndCacheImage(location.first,
+									location.second);
 							drawCachedImage();
 						} catch (IllegalStateException e) {
 							Log.e(TAG, e.getMessage());
 							drawErrorNotification(e.getMessage());
 						}
-						
+
 					}
 
 				} else {
@@ -730,8 +746,12 @@ public class FlickrService extends WallpaperService {
 
 		private long lastSync = 0;
 
-		private float cachedTopMargin = 0;
+		private static final float FRAMED_IMG_TOP_MARGIN = 220;
 
+		private static final int FRAMED_IMG_LEFT_MARGIN = 86;
+		
+		private long cachedImgTopMargin = 0;
+		
 		private boolean alignImgInMiddle = true;
 
 		private SharedPreferences mPrefs;
@@ -753,6 +773,8 @@ public class FlickrService extends WallpaperService {
 		private Pair<Location, String> location;
 
 		private Paint bgPaint;
+
+		private Bitmap frame;
 
 	}
 
