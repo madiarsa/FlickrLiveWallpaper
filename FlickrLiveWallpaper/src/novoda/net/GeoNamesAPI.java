@@ -1,6 +1,7 @@
 package novoda.net;
 
 import java.io.IOException;
+import java.net.ConnectException;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -53,7 +54,7 @@ public class GeoNamesAPI {
 		httpClient = new DefaultHttpClient(cm, httpParams);
 	}
 
-	public String getNearestPlaceName(String lat, String lon) {
+	public String getNearestPlaceName(String lat, String lon) throws ConnectException{
 		final HttpGet get = new HttpGet(
 				"http://ws.geonames.org/findNearbyPlaceNameJSON?lat=" + lat
 						+ "&lng=" + lon);
@@ -66,10 +67,8 @@ public class GeoNamesAPI {
 				array = handleResponse(response);
 				array = array.path("geonames").get(0);
 			}
-		} catch (ClientProtocolException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
+		}  catch (IOException e) {
+			throw new ConnectException(e.getMessage());
 		} finally {
 			if (entity != null) {
 				try {
