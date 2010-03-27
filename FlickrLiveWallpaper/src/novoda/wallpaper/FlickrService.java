@@ -24,10 +24,12 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.PorterDuff.Mode;
 import android.location.Location;
@@ -92,6 +94,16 @@ public class FlickrService extends WallpaperService {
 					.getAssets(), "fonts/ArnoProRegular10pt.otf");
 			txtPaint.setTypeface(typeFace);
 			txtPaint.setTextAlign(Paint.Align.CENTER);
+			
+			final Bitmap decodeResource = BitmapFactory.decodeResource(
+					getResources(), getResources().getIdentifier(
+							"bg_wallpaper_pattern", "drawable",
+					"novoda.wallpaper"));
+			
+			BitmapShader mShader1 = new BitmapShader(decodeResource, Shader.TileMode.REPEAT,
+                    Shader.TileMode.REPEAT);
+			bgPaint = new Paint();
+			bgPaint.setShader(mShader1);
 
 		}
 
@@ -239,9 +251,8 @@ public class FlickrService extends WallpaperService {
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
-				c.drawColor(Color.BLACK);
 				if (c != null && cachedBitmap != null) {
-					c.drawColor(0, Mode.DST_ATOP);
+					c.drawPaint(bgPaint);
 					c.drawBitmap(cachedBitmap, 0, cachedTopMargin, txtPaint);
 				}
 			} finally {
@@ -296,7 +307,7 @@ public class FlickrService extends WallpaperService {
 			return Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight,
 					true);
 		}
-
+		
 		/*
 		 * Initial loading feedback Also clears the screen of any old artifacts
 		 */
@@ -308,7 +319,7 @@ public class FlickrService extends WallpaperService {
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
-				c.drawColor(Color.BLACK);
+				c.drawPaint(bgPaint);
 				final Bitmap decodeResource = BitmapFactory.decodeResource(
 						getResources(), getResources().getIdentifier(
 								"ic_logo_flickr", "drawable",
@@ -318,6 +329,27 @@ public class FlickrService extends WallpaperService {
 							.drawBitmap(decodeResource, (x - decodeResource
 									.getWidth() * 0.5f), y, txtPaint);
 					c.drawText("Downloading Image", x, y + 108, txtPaint);
+				}
+			} finally {
+				if (c != null)
+					holder.unlockCanvasAndPost(c);
+			}
+		}
+		
+		/*
+		 * Draw Background
+		 */
+		private void drawBG() {
+			Log.d(TAG, "Displaying loading info");
+			final float x = displayMiddleX;
+			final float y = 180;
+			final SurfaceHolder holder = getSurfaceHolder();
+			Canvas c = null;
+			try {
+				c = holder.lockCanvas();
+				
+				if (c != null) {
+		            c.drawPaint(bgPaint);
 				}
 			} finally {
 				if (c != null)
@@ -340,7 +372,7 @@ public class FlickrService extends WallpaperService {
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
-				c.drawColor(Color.BLACK);
+				c.drawPaint(bgPaint);
 				final Bitmap decodeResource = BitmapFactory.decodeResource(
 						getResources(), getResources().getIdentifier(
 								"ic_logo_flickr", "drawable",
@@ -372,7 +404,7 @@ public class FlickrService extends WallpaperService {
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
-				c.drawColor(Color.BLACK);
+				c.drawPaint(bgPaint);
 				final Bitmap decodeResource = BitmapFactory.decodeResource(
 						getResources(), getResources().getIdentifier(
 								"ic_smile_sad_48", "drawable",
@@ -719,6 +751,8 @@ public class FlickrService extends WallpaperService {
 		private final PhotoSearch photoSearch = new PhotoSearch();
 
 		private Pair<Location, String> location;
+
+		private Paint bgPaint;
 
 	}
 
