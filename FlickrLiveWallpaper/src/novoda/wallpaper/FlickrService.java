@@ -29,6 +29,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
+import android.graphics.PorterDuff.Mode;
 import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
@@ -41,6 +42,22 @@ import android.view.Display;
 import android.view.SurfaceHolder;
 import android.view.WindowManager;
 
+/*
+ * ===================================
+ * Flickr Live Wallpaper 
+ * http://github.com/novoda/flickrlivewallpaper 
+ * ===================================
+ *  
+ * Retrieves and displays a photo from Flickr based on your current location.
+ * The majority of locations in the world do not have photos specifically 
+ * geoTagged on Flickr and so instead a query using the users exact location 
+ * is sent to GeoNames establish a good approximation and then queries 
+ * Flickr using the place name as a tag.
+ * 
+ * This code was developed by Novoda (http://www.novoda.com)
+ * You are welcome to use this code in however you see fit.
+ *
+ */
 public class FlickrService extends WallpaperService {
 
 	@Override
@@ -65,22 +82,39 @@ public class FlickrService extends WallpaperService {
 			mPrefs.registerOnSharedPreferenceChangeListener(this);
 			onSharedPreferenceChanged(mPrefs, null);
 			geoNamesAPI = new GeoNamesAPI();
+
+			txtPaint = new Paint();
+			txtPaint.setAntiAlias(true);
+			txtPaint.setColor(Color.WHITE);
+			txtPaint.setTextSize(37);
+			txtPaint.setStyle(Paint.Style.STROKE);
+			Typeface typeFace = Typeface.createFromAsset(getBaseContext()
+					.getAssets(), "fonts/ArnoProRegular10pt.otf");
+			txtPaint.setTypeface(typeFace);
+			txtPaint.setTextAlign(Paint.Align.CENTER);
+
 		}
 
 		@Override
-		public Bundle onCommand(String action, int x, int y, int z,
-				Bundle extras, boolean resultRequested) {
-			if (action.equals(WallpaperManager.COMMAND_TAP) && photo != null
-					&& !photo.hiResImg_url.equalsIgnoreCase("")) {
-				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri
-						.parse(photo.hiResImg_url));
-				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				startActivity(intent);
-
+		public void onDestroy() {
+			if (cachedBitmap != null) {
+				cachedBitmap.recycle();
 			}
-			return super.onCommand(action, x, y, z, extras, resultRequested);
+			photo = null;
+			cachedBitmap = null;
+			mHandler.removeCallbacks(mDrawWallpaper);
+			super.onDestroy();
 		}
 
+		/*
+		 * A new Wallpaper is requested every time the dashboard becomes visible
+		 * within a reasonable time period to save queries being made overly
+		 * often to save battery and bandwith.
+		 * 
+		 * @see
+		 * android.service.wallpaper.WallpaperService.Engine#onVisibilityChanged
+		 * (boolean)
+		 */
 		@Override
 		public void onVisibilityChanged(boolean visible) {
 			boolean reSynchNeeded = (System.currentTimeMillis() - lastSync) > 1000 * 60 * 60;
@@ -96,14 +130,16 @@ public class FlickrService extends WallpaperService {
 		}
 
 		@Override
-		public void onDestroy() {
-			if (cachedBitmap != null) {
-				cachedBitmap.recycle();
+		public Bundle onCommand(String action, int x, int y, int z,
+				Bundle extras, boolean resultRequested) {
+			if (action.equals(WallpaperManager.COMMAND_TAP) && photo != null
+					&& !photo.hiResImg_url.equalsIgnoreCase("")) {
+				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri
+						.parse(photo.hiResImg_url));
+				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+				startActivity(intent);
 			}
-			photo = null;
-			cachedBitmap = null;
-			mHandler.removeCallbacks(mDrawWallpaper);
-			super.onDestroy();
+			return super.onCommand(action, x, y, z, extras, resultRequested);
 		}
 
 		public void onSharedPreferenceChanged(
@@ -125,141 +161,36 @@ public class FlickrService extends WallpaperService {
 			}
 		}
 
-		private void drawCanvas() {
-			Log.d(TAG, "Drawing Canvas");
-			final SurfaceHolder holder = getSurfaceHolder();
-			Canvas c = null;
-			try {
-				c = holder.lockCanvas();
-				if (c != null && cachedBitmap != null) {
-					c.drawBitmap(cachedBitmap, 0, cachedTopMargin, new Paint());
-				}
-			} finally {
-				if (c != null)
-					holder.unlockCanvasAndPost(c);
-			}
-		}
-
-		private void drawInitialNotification() {
-			Log.d(TAG, "Displaying loading info");
-			float x = displayMiddleX;
-			float y = 180;
-			final SurfaceHolder holder = getSurfaceHolder();
-			Canvas c = null;
-			try {
-				c = holder.lockCanvas();
-				Paint paint = new Paint();
-				Bitmap decodeResource = BitmapFactory.decodeResource(
-						getResources(), getResources().getIdentifier(
-								"ic_logo_flickr", "drawable",
-								"novoda.wallpaper"));
-				c.drawBitmap(decodeResource,
-						(x - decodeResource.getWidth() * 0.5f), y, paint);
-				paint = new Paint();
-				paint.setAntiAlias(true);
-				paint.setColor(Color.WHITE);
-				paint.setTextSize(37);
-				paint.setStyle(Paint.Style.STROKE);
-				Typeface typeFace = Typeface.createFromAsset(getBaseContext()
-						.getAssets(), "fonts/ArnoProRegular10pt.otf");
-				paint.setTypeface(typeFace);
-				c.translate(0, 30);
-				paint.setTextAlign(Paint.Align.CENTER);
-
-				if (c != null) {
-					c.drawText("Downloading Image", x, y + 80, paint);
-				}
-			} finally {
-				if (c != null)
-					holder.unlockCanvasAndPost(c);
-			}
-		}
-
-		private void drawDetailedLoadingNotification(String placeName) {
-			Log.d(TAG, "Displaying loading details for placename=[" + placeName +"]");
-			float x = displayMiddleX;
-			float y = 180;
-			final SurfaceHolder holder = getSurfaceHolder();
-			Canvas c = null;
-			try {
-				c = holder.lockCanvas();
-				Paint paint = new Paint();
-				Bitmap decodeResource = BitmapFactory.decodeResource(
-						getResources(), getResources().getIdentifier(
-								"ic_logo_flickr", "drawable",
-								"novoda.wallpaper"));
-				c.drawBitmap(decodeResource,
-						(x - decodeResource.getWidth() * 0.5f), y, paint);
-				paint = new Paint();
-				paint.setAntiAlias(true);
-				paint.setColor(Color.WHITE);
-				paint.setTextSize(37);
-				paint.setStyle(Paint.Style.STROKE);
-				Typeface typeFace = Typeface.createFromAsset(getBaseContext()
-						.getAssets(), "fonts/ArnoProRegular10pt.otf");
-				paint.setTypeface(typeFace);
-				c.translate(0, 30);
-				paint.setTextAlign(Paint.Align.CENTER);
-
-				if (c != null) {
-					c.drawText("Downloading Image", x, y + 80, paint);
-					drawTextInRect(c, paint, new Rect((int) x, (int) y + 200,
-							700, 300), "Looking for images around " + placeName);
-				}
-			} finally {
-				if (c != null)
-					holder.unlockCanvasAndPost(c);
-			}
-		}
-		private void drawErrorNotification(String error) {
-			Log.e(TAG, error);
-			float x = displayMiddleX;
-			float y = 180;
-			final SurfaceHolder holder = getSurfaceHolder();
-			Canvas c = null;
-			try {
-				c = holder.lockCanvas();
-				Paint paint = new Paint();
-				Bitmap decodeResource = BitmapFactory.decodeResource(
-						getResources(), getResources().getIdentifier(
-								"ic_smile_sad_48", "drawable",
-						"novoda.wallpaper"));
-				c.drawBitmap(decodeResource, (x - decodeResource.getWidth() * 0.5f), y, paint);
-				paint = new Paint();
-				paint.setAntiAlias(true);
-				paint.setColor(Color.WHITE);
-				paint.setTextSize(37);
-				paint.setStyle(Paint.Style.STROKE);
-				Typeface typeFace = Typeface.createFromAsset(getBaseContext()
-						.getAssets(), "fonts/ArnoProRegular10pt.otf");
-				paint.setTypeface(typeFace);
-				c.translate(0, 30);
-				paint.setTextAlign(Paint.Align.CENTER);
-				
-				if (c != null) {
-					drawTextInRect(c, paint, new Rect((int) x, (int) y + 80,700, 300), error);
-				}
-			} finally {
-				if (c != null)
-					holder.unlockCanvasAndPost(c);
-			}
-		}
-
-		private void refreshImage(Location location, String placeName) {
+		private void requestAndCacheImage(Location location, String placeName) {
 			// List<Photo> list = getPhotosFromExactLocation(location);
-			List<Photo> photos = getPhotosFromSurrounding(placeName, location);
+			List<Photo> photos = getPhotosFromApproxLocation(placeName,
+					location);
 			PhotoSpec<String, Object> photoSpecs = getBestSpecs(photos);
 
 			if (photoSpecs != null) {
 				cachedBitmap = retrievePhotoFromSpecs(photoSpecs);
 			}
 		}
-		
-		private Pair<Location, String> obtainLocation() throws ConnectException{
-			Location location = getRecentLocation();
-			return new Pair<Location, String>(location, findLocation(location));
+
+		/*
+		 * Using the GeoNames API establish an approximate location
+		 * 
+		 * @return Pair<Location, String>(Location, placeName)
+		 */
+		private Pair<Location, String> obtainLocation() throws ConnectException {
+			Log
+					.d(TAG,
+							"Requesting photo details based on approximate location");
+			final Location location = getRecentLocation();
+			return new Pair<Location, String>(location, geoNamesAPI
+					.getNearestPlaceName(df.format(location.getLatitude()), df
+							.format(location.getLongitude())));
 		}
 
+		/*
+		 * Using existing details of a photos specifications obtained from the
+		 * Flickr API, request the binary stream from a HTTP connection
+		 */
 		private Bitmap retrievePhotoFromSpecs(
 				PhotoSpec<String, Object> photoSpecs) {
 			Bitmap original = null;
@@ -292,19 +223,37 @@ public class FlickrService extends WallpaperService {
 			return original;
 		}
 
+		/*
+		 * Renders a retrieved Photo to the Display
+		 */
+		private void drawCachedImage() {
+			Log.d(TAG, "Drawing Canvas");
+			final SurfaceHolder holder = getSurfaceHolder();
+			Canvas c = null;
+			try {
+				c = holder.lockCanvas();
+
+				if (c != null && cachedBitmap != null) {
+					c.drawColor(0, Mode.CLEAR);
+					c.drawBitmap(cachedBitmap, 0, cachedTopMargin, txtPaint);
+				}
+			} finally {
+				if (c != null)
+					holder.unlockCanvasAndPost(c);
+			}
+		}
+
 		/**
-		 * Should scale the bitmap to fit the height/width of the drawing
-		 * canvas.
+		 * Scale images to fit the height/width of the drawing canvas.
 		 * 
 		 * @param bitmap
 		 * @param width
 		 * @param height
 		 * @return
 		 */
-		Bitmap scaleImage(Bitmap bitmap, int width, int height) {
+		private Bitmap scaleImage(Bitmap bitmap, int width, int height) {
 			final int bitmapWidth = bitmap.getWidth();
 			final int bitmapHeight = bitmap.getHeight();
-
 			final float scale;
 
 			if (alignImgInMiddle) {
@@ -317,12 +266,6 @@ public class FlickrService extends WallpaperService {
 
 			final int scaledWidth = (int) (bitmapWidth * scale);
 			final int scaledHeight = (int) (bitmapHeight * scale);
-
-			Log.d(TAG, "Scaling Bitmap (height x width): Orginal["
-					+ bitmapHeight + "x" + bitmapWidth + "], New["
-					+ scaledHeight + "x" + scaledWidth + "]");
-			Bitmap createScaledBitmap = Bitmap.createScaledBitmap(bitmap,
-					scaledWidth, scaledHeight, true);
 
 			/*
 			 * Work out the Top Margin to align the image in the middle of the
@@ -339,7 +282,176 @@ public class FlickrService extends WallpaperService {
 				cachedTopMargin = 0;
 			}
 
-			return createScaledBitmap;
+			Log.d(TAG, "Scaling Bitmap (height x width): Orginal["
+					+ bitmapHeight + "x" + bitmapWidth + "], New["
+					+ scaledHeight + "x" + scaledWidth + "]");
+
+			return Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight,
+					true);
+		}
+
+		/*
+		 * Initial loading feedback
+		 */
+		private void drawInitialNotification() {
+			Log.d(TAG, "Displaying loading info");
+			final float x = displayMiddleX;
+			final float y = 180;
+			final SurfaceHolder holder = getSurfaceHolder();
+			Canvas c = null;
+			try {
+				c = holder.lockCanvas();
+				final Bitmap decodeResource = BitmapFactory.decodeResource(
+						getResources(), getResources().getIdentifier(
+								"ic_logo_flickr", "drawable",
+								"novoda.wallpaper"));
+				if (c != null) {
+					c
+							.drawBitmap(decodeResource, (x - decodeResource
+									.getWidth() * 0.5f), y, txtPaint);
+					c.drawText("Downloading Image", x, y + 108, txtPaint);
+				}
+			} finally {
+				if (c != null)
+					holder.unlockCanvasAndPost(c);
+			}
+		}
+
+		/*
+		 * Loading feedback to assure the user a place has been correctly
+		 * retrieved. This feedback is intended to help alleviate some of the
+		 * lag in retrieving and then resizing the image but also informs the
+		 * user of their presumed location.
+		 */
+		private void drawDetailedLoadingNotification(String placeName) {
+			Log.d(TAG, "Displaying loading details for placename=[" + placeName
+					+ "]");
+			final float x = displayMiddleX;
+			final float y = 180;
+			final SurfaceHolder holder = getSurfaceHolder();
+			Canvas c = null;
+			try {
+				c = holder.lockCanvas();
+				final Bitmap decodeResource = BitmapFactory.decodeResource(
+						getResources(), getResources().getIdentifier(
+								"ic_logo_flickr", "drawable",
+								"novoda.wallpaper"));
+				if (c != null) {
+					c
+							.drawBitmap(decodeResource, (x - decodeResource
+									.getWidth() * 0.5f), y, txtPaint);
+					c.drawText("Downloading Image", x, y + 108, txtPaint);
+					drawTextInRect(c, txtPaint, new Rect((int) x,
+							(int) y + 200, 700, 300),
+							"Looking for images around " + placeName);
+				}
+			} finally {
+				if (c != null)
+					holder.unlockCanvasAndPost(c);
+			}
+		}
+
+		private void drawErrorNotification(String error) {
+			Log.e(TAG, error);
+			float x = displayMiddleX;
+			float y = 180;
+			final SurfaceHolder holder = getSurfaceHolder();
+			Canvas c = null;
+			try {
+				c = holder.lockCanvas();
+				final Bitmap decodeResource = BitmapFactory.decodeResource(
+						getResources(), getResources().getIdentifier(
+								"ic_smile_sad_48", "drawable",
+								"novoda.wallpaper"));
+				if (c != null) {
+					c
+							.drawBitmap(decodeResource, (x - decodeResource
+									.getWidth() * 0.5f), y, txtPaint);
+					drawTextInRect(c, txtPaint, new Rect((int) x, (int) y + 80,
+							700, 300), error);
+				}
+			} finally {
+				if (c != null)
+					holder.unlockCanvasAndPost(c);
+			}
+		}
+
+		/*
+		 * TODO: Possibility of better ways to wrap text using staticLayout
+		 */
+		private void drawTextInRect(Canvas canvas, Paint paint, Rect r,
+				CharSequence text) {
+
+			// initial text range and starting position
+			int start = 0;
+			int end = text.length() - 1;
+			float x = r.left;
+			float y = r.top;
+			int allowedWidth = r.width();
+
+			if (allowedWidth < 30) {
+				return; // too small
+			}
+
+			int lineHeight = paint.getFontMetricsInt(null);
+
+			// For each line, with word wrap on whitespace.
+			while (start < end) {
+				final int charactersRemaining = end - start + 1;
+				int charactersToRenderThisPass = charactersRemaining; // optimism!
+				int extraSkip = 0;
+				// This 'while' is nothing to be proud of.
+				// This should probably be a binary search or more googling to
+				// find "character index at distance N pixels in string"
+				while (charactersToRenderThisPass > 0
+						&& paint.measureText(text, start, start
+								+ charactersToRenderThisPass) > allowedWidth) {
+					charactersToRenderThisPass--;
+				}
+
+				// charactersToRenderThisPass would definitely fit, but could be
+				// in the middle of a word
+				int thisManyWouldDefinitelyFit = charactersToRenderThisPass;
+				if (charactersToRenderThisPass < charactersRemaining) {
+					while (charactersToRenderThisPass > 0
+							&& !Character.isWhitespace(text.charAt(start
+									+ charactersToRenderThisPass - 1))) {
+						charactersToRenderThisPass--;
+					}
+				}
+
+				// line breaks
+				int i;
+				for (i = 0; i < charactersToRenderThisPass; i++) {
+					if (text.charAt(start + i) == '\n') {
+						charactersToRenderThisPass = i;
+						extraSkip = 1;
+						break;
+					}
+				}
+
+				if (charactersToRenderThisPass < 1 && (extraSkip == 0)) {
+					// no spaces found, must be a really long word.
+					// Panic and show as much as would fit, breaking the word in
+					// the middle
+					charactersToRenderThisPass = thisManyWouldDefinitelyFit;
+				}
+
+				// Emit this line of characters and advance our offsets for the
+				// next line
+				if (charactersToRenderThisPass > 0) {
+					canvas.drawText(text, start, start
+							+ charactersToRenderThisPass, x, y, paint);
+				}
+				start += charactersToRenderThisPass + extraSkip;
+				y += lineHeight;
+
+				// start had better advance each time through the while, or
+				// we've invented an infinite loop
+				if ((charactersToRenderThisPass + extraSkip) < 1) {
+					return;
+				}
+			}
 		}
 
 		private Location getRecentLocation() {
@@ -357,7 +469,7 @@ public class FlickrService extends WallpaperService {
 		}
 
 		/*
-		 * From the suitable specs collected, one is chosen at random.
+		 * Chosen an image from within a list of suitable photo specs.
 		 */
 		private PhotoSpec<String, Object> getBestSpecs(List<Photo> photos) {
 			Log.v(TAG, "Choosing a photo from amoungst those with URLs");
@@ -389,21 +501,20 @@ public class FlickrService extends WallpaperService {
 				}
 			}
 
-			int opts = options.size();
+			final int opts = options.size();
 			if (opts > 1) {
-				opts = randomWheel.nextInt(opts - 1);
-				return options.get(opts);
+				return options.get(randomWheel.nextInt(opts - 1));
 			}
 
 			return options.get(0);
 		}
 
 		/*
-		 * Use location to establish a place name via the GeoName API Query
-		 * Flickr to establish if photos are available Requery if photos can be
-		 * divided into pages (to help randomness)
+		 * Establish current place name via the GeoName API Query Use place name
+		 * to establish if photos are available as a tag on Flickr Requery if
+		 * photos can be divided into pages (to help randomness of results)
 		 */
-		private List<Photo> getPhotosFromSurrounding(String placeNameTag,
+		private List<Photo> getPhotosFromApproxLocation(String placeNameTag,
 				Location location) {
 
 			// Add random to ensure varying results
@@ -427,15 +538,9 @@ public class FlickrService extends WallpaperService {
 			return list;
 		}
 
-		private String findLocation(Location location) throws ConnectException{
-			Log
-					.d(TAG,
-							"Requesting photo details based on approximate location");
-			String place = geoNamesAPI.getNearestPlaceName(df.format(location
-					.getLatitude()), df.format(location.getLongitude()));
-			return place;
-		}
-
+		/*
+		 * Return Flickr photos based on the exact user's location
+		 */
 		private List<Photo> getPhotosFromExactLocation(Location location) {
 			Log.d(TAG, "Requesting photo details based on exact location");
 			final Flickr<Photo> photoSearch = new PhotoSearch();
@@ -484,7 +589,7 @@ public class FlickrService extends WallpaperService {
 		 * @param 24h clock format
 		 * @return Period of Day
 		 */
-		String getPeriodOfDay(int time) {
+		private String getPeriodOfDay(int time) {
 			if ((time > 22 && time <= 24) || (time >= 0 && time <= 5)) {
 				return "night";
 			}
@@ -508,102 +613,28 @@ public class FlickrService extends WallpaperService {
 		}
 
 		/*
-		 * TODO: There are rumoured better ways of wrapping text on canvas using a
-		 * staticLayout
+		 * Main thread of re-execution. Once called, an image will be retrieved
+		 * and then then drawn. This thread will wait until the canvas is
+		 * visible for when a a dialog or preference screen is shown.
 		 */
-		private void drawTextInRect(Canvas canvas, Paint paint, Rect r,
-				CharSequence text) {
-		
-			// initial text range and starting position
-			int start = 0;
-			int end = text.length() - 1;
-			float x = r.left;
-			float y = r.top;
-			int allowedWidth = r.width();
-		
-			if (allowedWidth < 30) {
-				return; // too small
-			}
-		
-			int lineHeight = paint.getFontMetricsInt(null);
-		
-			// For each line, with word wrap on whitespace.
-			while (start < end) {
-				int charactersRemaining = end - start + 1;
-				int charactersToRenderThisPass = charactersRemaining; // optimism!
-				int extraSkip = 0;
-				// This 'while' is nothing to be proud of.
-				// This should probably be a binary search or more googling to
-				// find "character index at distance N pixels in string"
-				while (charactersToRenderThisPass > 0
-						&& paint.measureText(text, start, start
-								+ charactersToRenderThisPass) > allowedWidth) {
-					charactersToRenderThisPass--;
-				}
-		
-				// charactersToRenderThisPass would definitely fit, but could be
-				// in the middle of a word
-				int thisManyWouldDefinitelyFit = charactersToRenderThisPass;
-				if (charactersToRenderThisPass < charactersRemaining) {
-					while (charactersToRenderThisPass > 0
-							&& !Character.isWhitespace(text.charAt(start
-									+ charactersToRenderThisPass - 1))) {
-						charactersToRenderThisPass--;
-					}
-				}
-		
-				// line breaks
-				int i;
-				for (i = 0; i < charactersToRenderThisPass; i++) {
-					if (text.charAt(start + i) == '\n') {
-						charactersToRenderThisPass = i;
-						extraSkip = 1;
-						break;
-					}
-				}
-		
-				if (charactersToRenderThisPass < 1 && (extraSkip == 0)) {
-					// no spaces found, must be a really long word.
-					// Panic and show as much as would fit, breaking the word in
-					// the middle
-					charactersToRenderThisPass = thisManyWouldDefinitelyFit;
-				}
-		
-				// Emit this line of characters and advance our offsets for the
-				// next line
-				if (charactersToRenderThisPass > 0) {
-					canvas.drawText(text, start, start
-							+ charactersToRenderThisPass, x, y, paint);
-				}
-				start += charactersToRenderThisPass + extraSkip;
-				y += lineHeight;
-		
-				// start had better advance each time through the while, or
-				// we've invented an infinite loop
-				if ((charactersToRenderThisPass + extraSkip) < 1) {
-					return;
-				}
-			}
-		}
-
 		private final Runnable mDrawWallpaper = new Runnable() {
 			public void run() {
 				if (currentlyVisibile) {
 					drawInitialNotification();
-					
-					try{
+
+					try {
 						location = obtainLocation();
-					}catch(ConnectException e){
-						location=null;
+					} catch (ConnectException e) {
+						location = null;
 						drawErrorNotification("Could not connect to the internet to find your location");
 					}
-					
+
 					if (location != null) {
 						drawDetailedLoadingNotification(location.second);
-						refreshImage(location.first, location.second);
-						drawCanvas();
+						requestAndCacheImage(location.first, location.second);
+						drawCachedImage();
 					}
-					
+
 				} else {
 					// Waiting until wallpaper becomes visible
 					mHandler.postDelayed(mDrawWallpaper, 600);
@@ -652,18 +683,20 @@ public class FlickrService extends WallpaperService {
 
 		private SharedPreferences mPrefs;
 
-		private Random randomWheel = new Random();
+		private final Random randomWheel = new Random();
 
 		private DecimalFormat df = new DecimalFormat("#.######");
 
 		private boolean currentlyVisibile = false;
 
+		private Paint txtPaint;
+
 		private GeoNamesAPI geoNamesAPI;
 
 		private float displayMiddleX;
 
-		private PhotoSearch photoSearch = new PhotoSearch();
-		
+		private final PhotoSearch photoSearch = new PhotoSearch();
+
 		private Pair<Location, String> location;
 
 	}
