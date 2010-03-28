@@ -3,6 +3,9 @@ package novoda.wallpaper.flickr;
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -90,7 +93,6 @@ public class Photo {
 	 * Return a URL in order of drawing preference
 	 */
 	public String getUrl(){
-		
 		final String url= null;
 		if(smallResImg_url!=null){
 			return smallResImg_url;
@@ -103,6 +105,39 @@ public class Photo {
 		}
 		if(url_sq!=null){
 			return url_sq;
+		}
+		return url;
+	}
+	
+	/*
+	 * Return a URL in order of your preference
+	 */
+	public String getUrl(String preference){
+		String url= null;
+		Map<String,String> map= new HashMap<String, String>();
+		if(smallResImg_url!=null){
+			map.put("small", smallResImg_url);
+		}
+		if(medResImg_url!=null){
+			map.put("medium", medResImg_url);
+		}
+		if(hiResImg_url!=null){
+			map.put("large", hiResImg_url);
+		}
+		if(url_sq!=null){
+			map.put("thumb", url_sq);
+		}
+		
+		if(map.containsKey(preference)){
+			url = preference;
+		}else{
+			if(map.containsKey("small")){
+				url=map.get("small");
+			}else if(map.containsKey("medium")){
+				url=map.get("medium");
+			}else if(map.containsKey("high")){
+				url=map.get("high");
+			}
 		}
 		return url;
 	}

@@ -217,7 +217,13 @@ public class FlickrService extends WallpaperService {
 				Log.d(TAG, "Requesting static image from Flickr=["
 						+ photo.getUrl()
 						+ "]");
-				photoUrl = new URL(photo.getUrl());
+				
+				if(alignImgInMiddle){
+					photoUrl = new URL(photo.getUrl());
+				}else{
+					photoUrl = new URL(photo.getUrl("large"));
+				}
+				
 			} catch (MalformedURLException error) {
 				error.printStackTrace();
 			}
