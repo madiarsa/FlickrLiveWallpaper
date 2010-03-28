@@ -89,6 +89,15 @@ public class Photo {
 		}
 	}
 	
+	
+	/*
+	 * Get the full flickr page URL
+	 * http://www.flickr.com/photos/<USESR>/<photoID>
+	 */
+	public String getFullFlickrUrl(){
+		return "http://www.flickr.com/photos/" + owner + "/" + id;
+	}
+	
 	/*
 	 * Return a URL in order of drawing preference
 	 */

@@ -153,7 +153,7 @@ public class FlickrService extends WallpaperService {
 					refreshOnClick=false;
 					mHandler.post(mDrawWallpaper);
 				}else{
-					final String url = cachedPhoto.getUrl();
+					final String url = cachedPhoto.getFullFlickrUrl();
 					Log.i(TAG, "Browsing to image=["+url+"]");
 					intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
 					intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
