@@ -541,17 +541,15 @@ public class FlickrService extends WallpaperService {
 		private Photo choosePhoto(List<Photo> photos) {
 			Log.v(TAG, "Choosing a photo from amoungst those with URLs");
 			
-			for(int i=0;i<photos.size();i++){
+			for(int i=0;i<photos.size();i++) {
 				if (photos.get(i).hiResImg_url == null || photos.get(i).medResImg_url == null || photos.get(i).smallResImg_url == null) {
 					photos.remove(i);
 				}
 			}
-
 			if (photos.size() > 1) {
 				cachedPhoto= photos.get(randomWheel.nextInt(photos.size() - 1));
 				return cachedPhoto;
 			}
-			
 			return photos.get(0);
 		}
 
