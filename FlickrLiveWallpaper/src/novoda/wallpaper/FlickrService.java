@@ -103,7 +103,7 @@ public class FlickrService extends WallpaperService {
 			bgPaint.setShader(mShader1);
 
 			frame = BitmapFactory.decodeResource(getResources(),
-					getResources().getIdentifier("frame", "drawable",
+					getResources().getIdentifier("bg_frame", "drawable",
 							"novoda.wallpaper"));
 		}
 
@@ -144,13 +144,23 @@ public class FlickrService extends WallpaperService {
 		@Override
 		public Bundle onCommand(String action, int x, int y, int z,
 				Bundle extras, boolean resultRequested) {
-			final String url = cachedPhoto.getUrl();
-			Log.i(TAG, "Browsing to image=["+url+"]");
-			if (action.equals(WallpaperManager.COMMAND_TAP) && url !=null) {
-				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				startActivity(intent);
+			Intent intent = null;
+			Log.i(TAG, "An action going on");
+			
+			if (action.equals(WallpaperManager.COMMAND_TAP)) {
+				if(refreshOnClick ==true){
+					Log.i(TAG, "Refresh on click");
+					refreshOnClick=false;
+					mHandler.post(mDrawWallpaper);
+				}else{
+					final String url = cachedPhoto.getUrl();
+					Log.i(TAG, "Browsing to image=["+url+"]");
+					intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+					intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+					startActivity(intent);
+				}
 			}
+			
 			return super.onCommand(action, x, y, z, extras, resultRequested);
 		}
 
@@ -398,6 +408,12 @@ public class FlickrService extends WallpaperService {
 			Log.e(TAG, error);
 			float x = displayMiddleX;
 			float y = 180;
+			refreshOnClick =true;
+			cachedPhoto=null;
+			if(cachedBitmap!=null){
+				cachedBitmap.recycle();
+			}
+			
 			final SurfaceHolder holder = getSurfaceHolder();
 			Canvas c = null;
 			try {
@@ -407,13 +423,19 @@ public class FlickrService extends WallpaperService {
 						getResources(), getResources().getIdentifier(
 								"ic_smile_sad_48", "drawable",
 								"novoda.wallpaper"));
+				final Bitmap refreshIcon = BitmapFactory.decodeResource(
+						getResources(), getResources().getIdentifier(
+								"ic_refresh_48", "drawable",
+								"novoda.wallpaper"));
 				if (c != null) {
 
 					c
-							.drawBitmap(decodeResource, (x - decodeResource
-									.getWidth() * 0.5f), y, txtPaint);
+					.drawBitmap(decodeResource, (x - decodeResource
+							.getWidth() * 0.5f), y, txtPaint);
 					drawTextInRect(c, txtPaint, new Rect((int) x,
 							(int) y + 108, 700, 300), error);
+					c
+					.drawBitmap(refreshIcon, (x - refreshIcon.getWidth() * 0.5f), 550, txtPaint);
 				}
 			} finally {
 				if (c != null)
@@ -720,6 +742,8 @@ public class FlickrService extends WallpaperService {
 		private Paint bgPaint;
 
 		private Bitmap frame;
+		
+		private boolean refreshOnClick = false;
 
 	}
 
