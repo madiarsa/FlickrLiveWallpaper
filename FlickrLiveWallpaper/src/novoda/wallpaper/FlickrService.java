@@ -205,7 +205,7 @@ public class FlickrService extends WallpaperService {
 							"Requesting photo details based on approximate location");
 			final Location location = getRecentLocation();
 			return new Pair<Location, String>(location, geoNamesAPI
-					.getNearestPlaceName(df.format(location.getLatitude()+1), df
+					.getNearestPlaceName(df.format(location.getLatitude()), df
 							.format(location.getLongitude())));
 		}
 
