@@ -101,10 +101,6 @@ public class FlickrService extends WallpaperService {
 			bg.recycle();
 			bgPaint = new Paint();
 			bgPaint.setShader(mShader1);
-
-			frame = BitmapFactory.decodeResource(getResources(),
-					getResources().getIdentifier("bg_frame", "drawable",
-							"novoda.wallpaper"));
 		}
 
 		@Override
@@ -209,7 +205,7 @@ public class FlickrService extends WallpaperService {
 							"Requesting photo details based on approximate location");
 			final Location location = getRecentLocation();
 			return new Pair<Location, String>(location, geoNamesAPI
-					.getNearestPlaceName(df.format(location.getLatitude()), df
+					.getNearestPlaceName(df.format(location.getLatitude()+1), df
 							.format(location.getLongitude())));
 		}
 
@@ -274,9 +270,24 @@ public class FlickrService extends WallpaperService {
 				if (c != null && cachedBitmap != null) {
 					
 					if(alignImgInMiddle){
-						c.drawPaint(bgPaint);
-						c.drawBitmap(frame, 45, 180, new Paint());
-						c.drawBitmap(cachedBitmap, FRAMED_IMG_LEFT_MARGIN, FRAMED_IMG_TOP_MARGIN, txtPaint);
+						
+						if(cachedBitmap.getWidth() > cachedBitmap.getHeight()){
+							Log.i(TAG, "LANDSCAPE IMG");
+						
+							c.drawPaint(bgPaint);
+							frame = BitmapFactory.decodeResource(getResources(),
+									getResources().getIdentifier("bg_frame_landscape", "drawable",
+									"novoda.wallpaper"));
+							c.drawBitmap(frame, LANDSCAPE_FRAME_LEFT_MARGIN, LANDSCAPE_FRAME_TOP_MARGIN, new Paint());
+							c.drawBitmap(cachedBitmap, LANDSCAPE_IMG_LEFT_MARGIN, LANDSCAPE_IMG_TOP_MARGIN, txtPaint);
+						}else{
+							Log.i(TAG, "PORTRAIT IMG");
+							c.drawPaint(bgPaint);
+							frame = BitmapFactory.decodeResource(getResources(),
+									getResources().getIdentifier("bg_frame_portrait", "drawable",	"novoda.wallpaper"));
+							c.drawBitmap(frame, PORTRAIT_FRAME_LEFT_MARGIN, PORTRAIT_FRAME_TOP_MARGIN, new Paint());
+							c.drawBitmap(cachedBitmap, PORTRAIT_IMG_LEFT_MARGIN, PORTRAIT_IMG_TOP_MARGIN, txtPaint);
+						}
 					}else{
 						c.drawBitmap(cachedBitmap, 0, 0, txtPaint);
 					}
@@ -303,10 +314,17 @@ public class FlickrService extends WallpaperService {
 			final int scaledHeight;
 
 			if (alignImgInMiddle) {
-				scale = Math.min((float) width / (float) bitmapWidth,
-						(float) height / (float) bitmapHeight);
-				scaledWidth = 318;
-				scaledHeight = 251;
+				
+				scale = Math.min((float) width / (float) bitmapWidth,	(float) height / (float) bitmapHeight);
+
+				if(bitmapWidth>bitmapHeight){
+					scaledWidth = 343;
+					scaledHeight = 271;
+				}else{
+					scaledWidth = 295;
+					scaledHeight = 372;
+				}
+				
 			} else {
 				scale = Math.max((float) width / (float) bitmapWidth,
 						(float) height / (float) bitmapHeight);
@@ -321,10 +339,8 @@ public class FlickrService extends WallpaperService {
 			 * = screenDivisions - (BitmapHeight*0.5)
 			 */
 			if (alignImgInMiddle) {
-				final float screenDividedByPic = Math.min(
-						(float) displayHeight, (float) scaledHeight);
-				cachedImgTopMargin = Math
-						.round((screenDividedByPic - (float) scaledHeight * 0.5));
+				final float screenDividedByPic = Math.min((float) displayHeight, (float) scaledHeight);
+				cachedImgTopMargin = Math.round((screenDividedByPic - (float) scaledHeight * 0.5));
 			} else {
 				cachedImgTopMargin = 0;
 			}
@@ -541,7 +557,7 @@ public class FlickrService extends WallpaperService {
 		private Photo choosePhoto(List<Photo> photos) {
 			Log.v(TAG, "Choosing a photo from amoungst those with URLs");
 			
-			for(int i=0;i<photos.size();i++) {
+			for(int i=0;i<photos.size();i++){
 				if (photos.get(i).hiResImg_url == null || photos.get(i).medResImg_url == null || photos.get(i).smallResImg_url == null) {
 					photos.remove(i);
 				}
@@ -711,10 +727,6 @@ public class FlickrService extends WallpaperService {
 
 		private long lastSync = 0;
 
-		private static final float FRAMED_IMG_TOP_MARGIN = 220;
-
-		private static final int FRAMED_IMG_LEFT_MARGIN = 86;
-		
 		private long cachedImgTopMargin = 0;
 		
 		private boolean alignImgInMiddle = true;
@@ -742,6 +754,22 @@ public class FlickrService extends WallpaperService {
 		private Bitmap frame;
 		
 		private boolean refreshOnClick = false;
+		
+		public static final int LANDSCAPE_FRAME_LEFT_MARGIN = 24;
+
+		public static final int LANDSCAPE_FRAME_TOP_MARGIN = 110;
+
+		public static final int LANDSCAPE_IMG_LEFT_MARGIN =  69;
+
+		public static final int LANDSCAPE_IMG_TOP_MARGIN = 154;
+		
+		private static final float PORTRAIT_IMG_TOP_MARGIN = 118;
+
+		private static final int PORTRAIT_IMG_LEFT_MARGIN = 97;
+		
+		private static final int PORTRAIT_FRAME_TOP_MARGIN = 70;
+
+		private static final int PORTRAIT_FRAME_LEFT_MARGIN = 47;
 
 	}
 

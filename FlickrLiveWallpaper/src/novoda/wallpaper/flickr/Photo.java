@@ -218,11 +218,10 @@ public class Photo {
 	// TODO make it DRY
 	public static Photo fromXPP(XmlPullParser xpp) {
 		Log.i(TAG, "Adding Photo from XPP");
-		for (int i = 0; i < xpp.getAttributeCount(); i++) {
-			Log.i(TAG, "Attribute[" + xpp.getAttributeName(i) + "]="
-					+ xpp.getAttributeValue(i));
-
-		}
+//		for (int i = 0; i < xpp.getAttributeCount(); i++) {
+//			Log.v(TAG, "Attribute[" + xpp.getAttributeName(i) + "]="
+//					+ xpp.getAttributeValue(i));
+//		}
 
 		Log.d(TAG, "--");
 		Photo photo = new Photo();
