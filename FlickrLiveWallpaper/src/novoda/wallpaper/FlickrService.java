@@ -7,10 +7,8 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -31,7 +29,6 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Shader;
 import android.graphics.Typeface;
-import android.graphics.PorterDuff.Mode;
 import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
@@ -259,9 +256,14 @@ public class FlickrService extends WallpaperService {
 			try {
 				c = holder.lockCanvas();
 				if (c != null && cachedBitmap != null) {
-					c.drawPaint(bgPaint);
-					c.drawBitmap(frame, 45, 180, new Paint());
-					c.drawBitmap(cachedBitmap, FRAMED_IMG_LEFT_MARGIN, FRAMED_IMG_TOP_MARGIN, txtPaint);
+					
+					if(alignImgInMiddle){
+						c.drawPaint(bgPaint);
+						c.drawBitmap(frame, 45, 180, new Paint());
+						c.drawBitmap(cachedBitmap, FRAMED_IMG_LEFT_MARGIN, FRAMED_IMG_TOP_MARGIN, txtPaint);
+					}else{
+						c.drawBitmap(cachedBitmap, 0, 0, txtPaint);
+					}
 				}
 			} finally {
 				if (c != null)
@@ -281,22 +283,21 @@ public class FlickrService extends WallpaperService {
 			final int bitmapWidth = bitmap.getWidth();
 			final int bitmapHeight = bitmap.getHeight();
 			final float scale;
+			final int scaledWidth;
+			final int scaledHeight;
 
-//			if (alignImgInMiddle) {
-//				scale = Math.min((float) width / (float) bitmapWidth,
-//						(float) height / (float) bitmapHeight);
-//			} else {
-//				scale = Math.max((float) width / (float) bitmapWidth,
-//						(float) height / (float) bitmapHeight);
-//			}
-//
-//			final int scaledWidth = (int) (bitmapWidth * scale);
-//			final int scaledHeight = (int) (bitmapHeight * scale);
-			
-			final int scaledWidth = 318;
-			final int scaledHeight = 251;
+			if (alignImgInMiddle) {
+				scale = Math.min((float) width / (float) bitmapWidth,
+						(float) height / (float) bitmapHeight);
+				scaledWidth = 318;
+				scaledHeight = 251;
+			} else {
+				scale = Math.max((float) width / (float) bitmapWidth,
+						(float) height / (float) bitmapHeight);
+				scaledWidth = (int) (bitmapWidth * scale);
+				scaledHeight = (int) (bitmapHeight * scale);
+			}
 
-			
 			/*
 			 * Work out the Top Margin to align the image in the middle of the
 			 * screen with a slightly larger bottom gutter for framing

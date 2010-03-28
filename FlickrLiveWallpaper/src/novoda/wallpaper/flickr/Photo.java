@@ -92,14 +92,14 @@ public class Photo {
 	public String getUrl(){
 		
 		final String url= null;
+		if(smallResImg_url!=null){
+			return smallResImg_url;
+		}
 		if(medResImg_url!=null){
 			return medResImg_url;
 		}
 		if(hiResImg_url!=null){
 			return hiResImg_url;
-		}
-		if(smallResImg_url!=null){
-			return smallResImg_url;
 		}
 		if(url_sq!=null){
 			return url_sq;

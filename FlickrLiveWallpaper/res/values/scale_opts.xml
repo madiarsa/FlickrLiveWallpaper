@@ -20,8 +20,8 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
 
     <string-array name="flickr_scaling_options">
-        <item>"In Middle"</item>
-        <item>"Whole Dashboard"</item>
+        <item>"Framed"</item>
+        <item>"Full Dashboard"</item>
     </string-array>
 
     <string-array name="flickr_scaling_options_values">
