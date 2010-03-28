@@ -57,6 +57,9 @@ public class Photo {
 	public Integer medResImg_height;
 	public String medResImg_url;
 	public Integer medResImg_width;
+	public String genericImg_url;
+	public String url_sq;
+	public String path_alias;
 
 	public Photo(int id, String owner, String secret, int server, int farm,
 			String title, boolean isPublic, boolean isFriend, boolean isFamily) {
@@ -72,7 +75,7 @@ public class Photo {
 		this.isFamily = isFamily;
 	}
 
-	protected Photo() {
+	public Photo() {
 	}
 
 	public String getPhotoURL(boolean original) {
@@ -81,6 +84,27 @@ public class Photo {
 		} else {
 			return String.format(URL_FORMAT, farm, server, id, secret);
 		}
+	}
+	
+	/*
+	 * Return a URL in order of drawing preference
+	 */
+	public String getUrl(){
+		
+		final String url= null;
+		if(medResImg_url!=null){
+			return medResImg_url;
+		}
+		if(hiResImg_url!=null){
+			return hiResImg_url;
+		}
+		if(smallResImg_url!=null){
+			return smallResImg_url;
+		}
+		if(url_sq!=null){
+			return url_sq;
+		}
+		return url;
 	}
 
 	/**
@@ -187,10 +211,12 @@ public class Photo {
 					"width_m")));
 
 			photo.hiResImg_url = (xpp.getAttributeValue(null, "url_o"));
-			photo.hiResImg_height = (new Integer(xpp.getAttributeValue(null,
-					"height_o")));
-			photo.hiResImg_width = (new Integer(xpp.getAttributeValue(null,
-					"width_o")));
+			photo.hiResImg_height = (new Integer(xpp.getAttributeValue(null,"height_o")));
+			photo.hiResImg_width = (new Integer(xpp.getAttributeValue(null,	"width_o")));
+
+			photo.url_sq =xpp.getAttributeValue(null,	"url_sq");
+			photo.path_alias = xpp.getAttributeValue(null,	"path_alias");
+			
 		} catch (NumberFormatException e) {
 			// bail
 		}

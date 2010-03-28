@@ -115,7 +115,7 @@ public class FlickrService extends WallpaperService {
 			if (cachedBitmap != null) {
 				cachedBitmap.recycle();
 			}
-			photo = null;
+			cachedPhoto = null;
 			cachedBitmap = null;
 			mHandler.removeCallbacks(mDrawWallpaper);
 			super.onDestroy();
@@ -147,10 +147,10 @@ public class FlickrService extends WallpaperService {
 		@Override
 		public Bundle onCommand(String action, int x, int y, int z,
 				Bundle extras, boolean resultRequested) {
-			if (action.equals(WallpaperManager.COMMAND_TAP) && photo != null
-					&& !photo.hiResImg_url.equalsIgnoreCase("")) {
-				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri
-						.parse(photo.hiResImg_url));
+			final String url = cachedPhoto.getUrl();
+			Log.i(TAG, "Browsing to image=["+url+"]");
+			if (action.equals(WallpaperManager.COMMAND_TAP) && url !=null) {
+				final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
 				intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 				startActivity(intent);
 			}
@@ -184,10 +184,10 @@ public class FlickrService extends WallpaperService {
 			// List<Photo> list = getPhotosFromExactLocation(location);
 			List<Photo> photos = getPhotosFromApproxLocation(placeName,
 					location);
-			PhotoSpec<String, Object> photoSpecs = getBestSpecs(photos);
+			cachedPhoto = choosePhoto(photos);
 
-			if (photoSpecs != null) {
-				cachedBitmap = retrievePhotoFromSpecs(photoSpecs);
+			if (cachedPhoto != null) {
+				cachedBitmap = retrievePhoto(cachedPhoto);
 			}
 		}
 
@@ -210,18 +210,17 @@ public class FlickrService extends WallpaperService {
 		 * Using existing details of a photos specifications obtained from the
 		 * Flickr API, request the binary stream from a HTTP connection
 		 */
-		private Bitmap retrievePhotoFromSpecs(
-				PhotoSpec<String, Object> photoSpecs)
+		private Bitmap retrievePhoto(
+				Photo photo)
 				throws IllegalStateException {
 			Bitmap original = null;
 			URL photoUrl = null;
 
 			try {
 				Log.d(TAG, "Requesting static image from Flickr=["
-						+ (String) photoSpecs.get(PhotoSpec.PHOTOSPEC_URL)
+						+ photo.getUrl()
 						+ "]");
-				photoUrl = new URL((String) photoSpecs
-						.get(PhotoSpec.PHOTOSPEC_URL));
+				photoUrl = new URL(photo.getUrl());
 			} catch (MalformedURLException error) {
 				error.printStackTrace();
 			}
@@ -342,28 +341,6 @@ public class FlickrService extends WallpaperService {
 							.drawBitmap(decodeResource, (x - decodeResource
 									.getWidth() * 0.5f), y, txtPaint);
 					c.drawText("Downloading Image", x, y + 108, txtPaint);
-				}
-			} finally {
-				if (c != null)
-					holder.unlockCanvasAndPost(c);
-			}
-		}
-
-		/*
-		 * Draw Background
-		 */
-		private void drawBG() {
-			Log.d(TAG, "Displaying loading info");
-			final float x = displayMiddleX;
-			final float y = 180;
-			final SurfaceHolder holder = getSurfaceHolder();
-			Canvas c = null;
-			try {
-				c = holder.lockCanvas();
-
-				if (c != null) {
-					c.drawPaint(bgPaint);
-
 				}
 			} finally {
 				if (c != null)
@@ -532,42 +509,21 @@ public class FlickrService extends WallpaperService {
 		/*
 		 * Chosen an image from within a list of suitable photo specs.
 		 */
-		private PhotoSpec<String, Object> getBestSpecs(List<Photo> photos) {
+		private Photo choosePhoto(List<Photo> photos) {
 			Log.v(TAG, "Choosing a photo from amoungst those with URLs");
-			PhotoSpec<String, Object> spec = new PhotoSpec<String, Object>();
-			List<PhotoSpec<String, Object>> options = new ArrayList<PhotoSpec<String, Object>>();
-			for (Photo p : photos) {
-				if (p.hiResImg_url != null) {
-					spec.put(PhotoSpec.PHOTOSPEC_HEIGHT, p.hiResImg_height);
-					spec.put(PhotoSpec.PHOTOSPEC_WIDTH, p.hiResImg_width);
-					spec.put(PhotoSpec.PHOTOSPEC_URL, p.hiResImg_url);
-					options.add(spec);
-					spec = new PhotoSpec<String, Object>();
-				}
-
-				if (p.medResImg_url != null) {
-					spec.put(PhotoSpec.PHOTOSPEC_HEIGHT, p.medResImg_height);
-					spec.put(PhotoSpec.PHOTOSPEC_WIDTH, p.medResImg_width);
-					spec.put(PhotoSpec.PHOTOSPEC_URL, p.medResImg_url);
-					options.add(spec);
-					spec = new PhotoSpec<String, Object>();
-				}
-
-				if (p.smallResImg_url != null) {
-					spec.put(PhotoSpec.PHOTOSPEC_HEIGHT, p.smallResImg_height);
-					spec.put(PhotoSpec.PHOTOSPEC_WIDTH, p.smallResImg_width);
-					spec.put(PhotoSpec.PHOTOSPEC_URL, p.smallResImg_url);
-					options.add(spec);
-					spec = new PhotoSpec<String, Object>();
+			
+			for(int i=0;i<photos.size();i++){
+				if (photos.get(i).hiResImg_url == null || photos.get(i).medResImg_url == null || photos.get(i).smallResImg_url == null) {
+					photos.remove(i);
 				}
 			}
 
-			final int opts = options.size();
-			if (opts > 1) {
-				return options.get(randomWheel.nextInt(opts - 1));
+			if (photos.size() > 1) {
+				cachedPhoto= photos.get(randomWheel.nextInt(photos.size() - 1));
+				return cachedPhoto;
 			}
-
-			return options.get(0);
+			
+			return photos.get(0);
 		}
 
 		/*
@@ -583,10 +539,9 @@ public class FlickrService extends WallpaperService {
 			photoSearch.with("tags", placeNameTag);
 			photoSearch.with("sort", "interestingness-desc");
 			photoSearch.with("media", "photos");
-			photoSearch.with("extras", "url_m");
-			photoSearch.with("extras", "url_o");
-			photoSearch.with("extras", "url_s");
+			photoSearch.with("extras", "url_s,url_m,original_format,path_alias,url_sq,url_t");
 			photoSearch.with("per_page", "50");
+			
 			List<Photo> list = photoSearch.fetchStructuredDataList();
 
 			if (list.size() > 1) {
@@ -711,23 +666,6 @@ public class FlickrService extends WallpaperService {
 			}
 		};
 
-		/*
-		 * This class exists just to save the essentials of what is needed to
-		 * deal with images being requested and cached.
-		 */
-		@SuppressWarnings("hiding")
-		private class PhotoSpec<String, Object> extends HashMap<String, Object> {
-
-			private static final long serialVersionUID = 1L;
-
-			public final static java.lang.String PHOTOSPEC_URL = "url";
-
-			public final static java.lang.String PHOTOSPEC_WIDTH = "width";
-
-			public final static java.lang.String PHOTOSPEC_HEIGHT = "height";
-
-		}
-
 		private final Handler mHandler = new Handler();
 
 		private static final String PREF_SCALE_TYPE_FULL = "full";
@@ -742,7 +680,7 @@ public class FlickrService extends WallpaperService {
 
 		private int displayHeight;
 
-		private Photo photo = null;
+		private Photo cachedPhoto = null;
 
 		private long lastSync = 0;
 
@@ -779,5 +717,6 @@ public class FlickrService extends WallpaperService {
 	}
 
 	public static final String TAG = FlickrService.class.getSimpleName();
+	
 	public static final String SHARED_PREFS_NAME = "flickrSettings";
 }
