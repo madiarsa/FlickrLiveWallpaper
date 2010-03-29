@@ -33,6 +33,7 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Debug;
 import android.os.Handler;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
@@ -690,7 +691,6 @@ public class FlickrService extends WallpaperService {
 
 					if (location != null) {
 						drawDetailedLoadingNotification(location.second);
-
 						try {
 							requestAndCacheImage(location.first,
 									location.second);
@@ -699,7 +699,7 @@ public class FlickrService extends WallpaperService {
 							Log.e(TAG, e.getMessage());
 							drawErrorNotification(e.getMessage());
 						}
-
+						
 					}
 
 				} else {
@@ -708,7 +708,7 @@ public class FlickrService extends WallpaperService {
 				}
 			}
 		};
-
+		
 		private final Handler mHandler = new Handler();
 
 		private static final String PREF_SCALE_TYPE_FULL = "full";
@@ -716,8 +716,6 @@ public class FlickrService extends WallpaperService {
 		private static final String PREF_SCALE_TYPE_MIDDLE = "middle";
 
 		private static final String PREF_SCALE_TYPE = "flickr_scale";
-
-		private Bitmap cachedBitmap = null;
 
 		private int displayWidth;
 
@@ -773,6 +771,7 @@ public class FlickrService extends WallpaperService {
 
 	}
 
+	private static Bitmap cachedBitmap;
 	public static final String TAG = FlickrService.class.getSimpleName();
 	
 	public static final String SHARED_PREFS_NAME = "flickrSettings";

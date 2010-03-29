@@ -217,13 +217,13 @@ public class Photo {
 	// can't get raw string from xpp so adapting badly with no DRY...
 	// TODO make it DRY
 	public static Photo fromXPP(XmlPullParser xpp) {
-		Log.i(TAG, "Adding Photo from XPP");
+//		Log.i(TAG, "Adding Photo from XPP");
 //		for (int i = 0; i < xpp.getAttributeCount(); i++) {
 //			Log.v(TAG, "Attribute[" + xpp.getAttributeName(i) + "]="
 //					+ xpp.getAttributeValue(i));
 //		}
 
-		Log.d(TAG, "--");
+//		Log.d(TAG, "--");
 		Photo photo = new Photo();
 		try {
 			int isFamily = new Integer(xpp.getAttributeValue(null, "isfamily"));
