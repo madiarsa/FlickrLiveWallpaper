@@ -150,7 +150,7 @@ public class Photo {
 		}
 		return url;
 	}
-
+	
 	/**
 	 * Gets a new Photo object from XML
 	 * 

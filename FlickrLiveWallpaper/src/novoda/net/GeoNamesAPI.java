@@ -113,7 +113,7 @@ public class GeoNamesAPI {
 
 	protected static final String HTTP_CONTENT_TYPE_HEADER = "Content-Type";
 
-	protected static final String HTTP_USER_AGENT = "Android/RESTProvider";
+	protected static final String HTTP_USER_AGENT = "Android/FlickrLiveWallpaper";
 
 	protected static AbstractHttpClient httpClient;
 }

@@ -16,7 +16,12 @@ import novoda.net.Flickr;
 import novoda.net.GeoNamesAPI;
 import novoda.wallpaper.flickr.Photo;
 import novoda.wallpaper.flickr.PhotoSearch;
+import android.app.ActivityManager;
 import android.app.WallpaperManager;
+import android.app.ActivityManager.RecentTaskInfo;
+import android.app.ActivityManager.RunningAppProcessInfo;
+import android.app.ActivityManager.RunningTaskInfo;
+import android.app.Instrumentation.ActivityMonitor;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -33,8 +38,9 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Debug;
 import android.os.Handler;
+import android.os.IBinder;
+import android.preference.Preference.OnPreferenceChangeListener;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
 import android.util.Pair;
@@ -65,14 +71,33 @@ public class FlickrService extends WallpaperService {
 		return new FlickrEngine();
 	}
 
+	@Override
+	public void onCreate() {
+		WallpaperManager instance = WallpaperManager.getInstance(this);
+		Log.i(TAG,"on create" + instance);
+		super.onCreate();
+	}
+	
+	private static final int MAX_RETRIES = 5;
+	private static final int RETRY_SLEEP_TIME_MILLIS = 3 * 1000;
+	private static final int CONNECTION_TIMEOUT = 10 * 1000;
+	private static final int MAX_CONNECTIONS = 6;
+	private static final int READ_TIMEOUT = 60 * 1000;
+	protected static final String HTTP_USER_AGENT = "Android/FlickerLiveWallpaper";
+
 	class FlickrEngine extends Engine implements
 			SharedPreferences.OnSharedPreferenceChangeListener {
 
+		private static final String USER_AGENT = "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_4_11; ar) AppleWebKit/525.18 (KHTML, like Gecko) Version/3.1.2 Safari/525.22";
+
 		@Override
 		public void onCreate(SurfaceHolder surfaceHolder) {
+			Log.i(TAG, "OnCreate");
+			
 			super.onCreate(surfaceHolder);
 			Display dm = ((WindowManager) getSystemService(WINDOW_SERVICE))
 					.getDefaultDisplay();
+			
 			displayWidth = dm.getWidth();
 			displayHeight = dm.getHeight();
 			displayMiddleX = displayWidth * 0.5f;
@@ -100,6 +125,7 @@ public class FlickrService extends WallpaperService {
 			BitmapShader mShader1 = new BitmapShader(bg,
 					Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
 			bg.recycle();
+
 			bgPaint = new Paint();
 			bgPaint.setShader(mShader1);
 		}
@@ -114,7 +140,8 @@ public class FlickrService extends WallpaperService {
 			mHandler.removeCallbacks(mDrawWallpaper);
 			super.onDestroy();
 		}
-
+		
+		
 		/*
 		 * A new Wallpaper is requested every time the dashboard becomes visible
 		 * within a reasonable time period to save queries being made overly
@@ -142,22 +169,22 @@ public class FlickrService extends WallpaperService {
 		public Bundle onCommand(String action, int x, int y, int z,
 				Bundle extras, boolean resultRequested) {
 			Intent intent = null;
-			Log.i(TAG, "An action going on");
-			
+			Log.i(TAG, "An action going on" + action);
+
 			if (action.equals(WallpaperManager.COMMAND_TAP)) {
-				if(refreshOnClick ==true){
+				if (refreshOnClick == true) {
 					Log.i(TAG, "Refresh on click");
-					refreshOnClick=false;
+					refreshOnClick = false;
 					mHandler.post(mDrawWallpaper);
-				}else{
+				} else {
 					final String url = cachedPhoto.getFullFlickrUrl();
-					Log.i(TAG, "Browsing to image=["+url+"]");
+					Log.i(TAG, "Browsing to image=[" + url + "]");
 					intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
 					intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 					startActivity(intent);
 				}
 			}
-			
+
 			return super.onCommand(action, x, y, z, extras, resultRequested);
 		}
 
@@ -194,7 +221,7 @@ public class FlickrService extends WallpaperService {
 				cachedBitmap = retrievePhoto(cachedPhoto);
 			}
 		}
-
+		
 		/*
 		 * Using the GeoNames API establish an approximate location
 		 * 
@@ -214,84 +241,142 @@ public class FlickrService extends WallpaperService {
 		 * Using existing details of a photos specifications obtained from the
 		 * Flickr API, request the binary stream from a HTTP connection
 		 */
-		private Bitmap retrievePhoto(
-				Photo photo)
-				throws IllegalStateException {
-			Bitmap original = null;
+		private Bitmap retrievePhoto(Photo photo) throws IllegalStateException {
 			URL photoUrl = null;
 
 			try {
 				Log.d(TAG, "Requesting static image from Flickr=["
-						+ photo.getUrl()
-						+ "]");
-				
-				if(alignImgInMiddle){
+						+ photo.getUrl() + "]");
+
+				if (alignImgInMiddle) {
 					photoUrl = new URL(photo.getUrl());
-				}else{
+				} else {
 					photoUrl = new URL(photo.getUrl("large"));
 				}
-				
+
 			} catch (MalformedURLException error) {
 				error.printStackTrace();
 			}
 
-			try {
-				HttpURLConnection connection = (HttpURLConnection) photoUrl
-						.openConnection();
-				connection.setDoInput(true);
-				connection.connect();
-				InputStream input = connection.getInputStream();
-				original = BitmapFactory.decodeStream(input);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			Bitmap bitmap = null;
+			int retries = 0;
+			do {
+				bitmap = retrieveBitmap(photoUrl);
+				Log.i(TAG, "Retrieved: " + retries);
+				retries++;
+			} while (bitmap == null && retries < 3);
 
-			if (original == null) {
+			if (bitmap == null) {
 				Log
 						.e(TAG,
-								"I'm not sure what went wrong but image coul not be retrieved");
+								"I'm not sure what went wrong but image could not be retrieved");
 				throw new IllegalStateException(
 						"Whoops! We had problems retrieving an image. Please try again.");
 			} else {
-				original = scaleImage(original, displayWidth, displayHeight);
+				bitmap = scaleImage(bitmap, displayWidth, displayHeight);
 			}
 
-			return original;
+			return bitmap;
 		}
 
-		/*
-		 * Renders a retrieved Photo to the Display
-		 */
-		private void drawCachedImage() {
-			Log.d(TAG, "Drawing Canvas");
+		private Bitmap retrieveBitmap(URL photoUrl) {
+			Bitmap bitmap = null;
+			HttpURLConnection connection = null;
+			System.setProperty("http.keepAlive", "false");
+
+			/*
+			 * HACK: Related to Android #Issue 6850 HttpURLConnection has
+			 * provided mixed reliability in Android and so looping in this
+			 * manor ensures a good connection if it is available. An
+			 * alternative is setting System.setProperty("http.keepAlive",
+			 * "false"); but I did not see results from this.
+			 */
+			int http_response_code = -1;
+			for (int retries = 0; retries < 10; retries++) {
+				Log.i(TAG, "retrying connection: " + retries);
+				try {
+					connection = (HttpURLConnection) photoUrl.openConnection();
+					connection.addRequestProperty("User-Agent", USER_AGENT);
+					connection.setConnectTimeout(CONNECTION_TIMEOUT);
+					connection.setDoInput(true);
+					connection.connect();
+					http_response_code = connection.getResponseCode();
+				} catch (IOException e) {
+					Log.e(TAG, "Error connecting to service", e);
+					http_response_code = -1;
+				}
+				if (http_response_code == HttpURLConnection.HTTP_OK) {
+					Log.i(TAG, "response code is successful "
+							+ http_response_code);
+					Log.i(TAG, "Content length "
+							+ connection.getContentLength());
+					Log.i(TAG, "Content type: " + connection.getContentType());
+					try {
+						Log.i(TAG, "Response message: "
+								+ connection.getResponseMessage());
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					Log.i(TAG, "Headers: "
+							+ connection.getHeaderFields().entrySet());
+					retries = 10;
+				} else {
+					Log.d(TAG, "Unsuccessful Connection response: "
+							+ http_response_code);
+				}
+			}
+
+			try {
+				InputStream input = connection.getInputStream();
+				bitmap = BitmapFactory.decodeStream(input);
+			} catch (IOException e) {
+				Log
+						.e(
+								TAG,
+								"Could not retrieve bitmap from resulting httpResponse",
+								e);
+			}
+			return bitmap;
+		}
+
+		private void drawPortraitFramedImage() {
 			final SurfaceHolder holder = getSurfaceHolder();
 			Canvas c = null;
 			try {
 				c = holder.lockCanvas();
 				if (c != null && cachedBitmap != null) {
-					
-					if(alignImgInMiddle){
-						
-						if(cachedBitmap.getWidth() > cachedBitmap.getHeight()){
-							Log.i(TAG, "LANDSCAPE IMG");
-						
-							c.drawPaint(bgPaint);
-							frame = BitmapFactory.decodeResource(getResources(),
-									getResources().getIdentifier("bg_frame_landscape", "drawable",
-									"novoda.wallpaper"));
-							c.drawBitmap(frame, LANDSCAPE_FRAME_LEFT_MARGIN, LANDSCAPE_FRAME_TOP_MARGIN, new Paint());
-							c.drawBitmap(cachedBitmap, LANDSCAPE_IMG_LEFT_MARGIN, LANDSCAPE_IMG_TOP_MARGIN, txtPaint);
-						}else{
-							Log.i(TAG, "PORTRAIT IMG");
-							c.drawPaint(bgPaint);
-							frame = BitmapFactory.decodeResource(getResources(),
-									getResources().getIdentifier("bg_frame_portrait", "drawable",	"novoda.wallpaper"));
-							c.drawBitmap(frame, PORTRAIT_FRAME_LEFT_MARGIN, PORTRAIT_FRAME_TOP_MARGIN, new Paint());
-							c.drawBitmap(cachedBitmap, PORTRAIT_IMG_LEFT_MARGIN, PORTRAIT_IMG_TOP_MARGIN, txtPaint);
-						}
-					}else{
-						c.drawBitmap(cachedBitmap, 0, 0, txtPaint);
-					}
+					Log.i(TAG, "PORTRAIT IMG");
+					c.drawPaint(bgPaint);
+					frame = BitmapFactory.decodeResource(getResources(),
+							getResources().getIdentifier("bg_frame_portrait",
+									"drawable", "novoda.wallpaper"));
+					c.drawBitmap(frame, PORTRAIT_FRAME_LEFT_MARGIN,
+							PORTRAIT_FRAME_TOP_MARGIN, new Paint());
+					c.drawBitmap(cachedBitmap, PORTRAIT_IMG_LEFT_MARGIN,
+							PORTRAIT_IMG_TOP_MARGIN, txtPaint);
+				}
+			} finally {
+				if (c != null)
+					holder.unlockCanvasAndPost(c);
+			}
+		}
+
+		private void drawLandscapeFramedImage() {
+			final SurfaceHolder holder = getSurfaceHolder();
+			Canvas c = null;
+			try {
+				c = holder.lockCanvas();
+				if (c != null && cachedBitmap != null) {
+					Log.i(TAG, "LANDSCAPE IMG");
+
+					c.drawPaint(bgPaint);
+					frame = BitmapFactory.decodeResource(getResources(),
+							getResources().getIdentifier("bg_frame_landscape",
+									"drawable", "novoda.wallpaper"));
+					c.drawBitmap(frame, LANDSCAPE_FRAME_LEFT_MARGIN,
+							LANDSCAPE_FRAME_TOP_MARGIN, new Paint());
+					c.drawBitmap(cachedBitmap, LANDSCAPE_IMG_LEFT_MARGIN,
+							LANDSCAPE_IMG_TOP_MARGIN, txtPaint);
 				}
 			} finally {
 				if (c != null)
@@ -315,22 +400,27 @@ public class FlickrService extends WallpaperService {
 			final int scaledHeight;
 
 			if (alignImgInMiddle) {
-				
-				scale = Math.min((float) width / (float) bitmapWidth,	(float) height / (float) bitmapHeight);
 
-				if(bitmapWidth>bitmapHeight){
+				scale = Math.min((float) width / (float) bitmapWidth,
+						(float) height / (float) bitmapHeight);
+
+				if (bitmapWidth > bitmapHeight) {
 					scaledWidth = 343;
 					scaledHeight = 271;
-				}else{
+				} else {
 					scaledWidth = 295;
 					scaledHeight = 372;
 				}
-				
+
 			} else {
-				scale = Math.max((float) width / (float) bitmapWidth,
-						(float) height / (float) bitmapHeight);
-				scaledWidth = (int) (bitmapWidth * scale);
-				scaledHeight = (int) (bitmapHeight * scale);
+				double scaledY = 1, scaledX = 1;
+				scaledX = width / bitmapWidth;
+				scaledY = height / bitmapHeight;
+				scaledX = Math.min(scaledX, scaledY);
+				scaledY = scaledX;
+
+				scaledWidth = (int) (bitmapWidth * scaledX);
+				scaledHeight = (int) (bitmapHeight * scaledY);
 			}
 
 			/*
@@ -340,8 +430,10 @@ public class FlickrService extends WallpaperService {
 			 * = screenDivisions - (BitmapHeight*0.5)
 			 */
 			if (alignImgInMiddle) {
-				final float screenDividedByPic = Math.min((float) displayHeight, (float) scaledHeight);
-				cachedImgTopMargin = Math.round((screenDividedByPic - (float) scaledHeight * 0.5));
+				final float screenDividedByPic = Math.min(
+						(float) displayHeight, (float) scaledHeight);
+				cachedImgTopMargin = Math
+						.round((screenDividedByPic - (float) scaledHeight * 0.5));
 			} else {
 				cachedImgTopMargin = 0;
 			}
@@ -357,7 +449,7 @@ public class FlickrService extends WallpaperService {
 		/*
 		 * Initial loading feedback Also clears the screen of any old artifacts
 		 */
-		private void drawInitialNotification() {
+		private void drawInitialLoadingNotification() {
 			Log.d(TAG, "Displaying loading info");
 			final float x = displayMiddleX;
 			final float y = 180;
@@ -374,7 +466,7 @@ public class FlickrService extends WallpaperService {
 					c
 							.drawBitmap(decodeResource, (x - decodeResource
 									.getWidth() * 0.5f), y, txtPaint);
-					c.drawText("Downloading Image", x, y + 108, txtPaint);
+					c.drawText("Finding your location", x, y + 108, txtPaint);
 				}
 			} finally {
 				if (c != null)
@@ -418,6 +510,35 @@ public class FlickrService extends WallpaperService {
 		}
 
 		/*
+		 * Present information designed to inform the user about a behaviour
+		 * which is not erroneous.
+		 */
+		public void drawScalingImageNotification(String string) {
+			Log.i(TAG, string);
+			float x = displayMiddleX;
+			float y = 180;
+
+			final SurfaceHolder holder = getSurfaceHolder();
+			Canvas c = null;
+			try {
+				c = holder.lockCanvas();
+				c.drawPaint(bgPaint);
+				final Bitmap fullScreenIcon = BitmapFactory.decodeResource(
+						getResources(), R.drawable.ic_fullscreen);
+				if (c != null) {
+					drawTextInRect(c, txtPaint, new Rect((int) x, (int) y, 700,
+							300), string);
+					c.drawBitmap(fullScreenIcon,
+							(x - fullScreenIcon.getWidth() * 0.5f), y + 208,
+							txtPaint);
+				}
+			} finally {
+				if (c != null)
+					holder.unlockCanvasAndPost(c);
+			}
+		}
+
+		/*
 		 * Provides error feedback for users Also clears the screen of any old
 		 * artifacts
 		 */
@@ -425,12 +546,12 @@ public class FlickrService extends WallpaperService {
 			Log.e(TAG, error);
 			float x = displayMiddleX;
 			float y = 180;
-			refreshOnClick =true;
-			cachedPhoto=null;
-			if(cachedBitmap!=null){
+			refreshOnClick = true;
+			cachedPhoto = null;
+			if (cachedBitmap != null) {
 				cachedBitmap.recycle();
 			}
-			
+
 			final SurfaceHolder holder = getSurfaceHolder();
 			Canvas c = null;
 			try {
@@ -441,18 +562,18 @@ public class FlickrService extends WallpaperService {
 								"ic_smile_sad_48", "drawable",
 								"novoda.wallpaper"));
 				final Bitmap refreshIcon = BitmapFactory.decodeResource(
-						getResources(), getResources().getIdentifier(
-								"ic_refresh_48", "drawable",
-								"novoda.wallpaper"));
+						getResources(), getResources()
+								.getIdentifier("ic_refresh_48", "drawable",
+										"novoda.wallpaper"));
 				if (c != null) {
 
 					c
-					.drawBitmap(decodeResource, (x - decodeResource
-							.getWidth() * 0.5f), y, txtPaint);
+							.drawBitmap(decodeResource, (x - decodeResource
+									.getWidth() * 0.5f), y, txtPaint);
 					drawTextInRect(c, txtPaint, new Rect((int) x,
 							(int) y + 108, 700, 300), error);
-					c
-					.drawBitmap(refreshIcon, (x - refreshIcon.getWidth() * 0.5f), 550, txtPaint);
+					c.drawBitmap(refreshIcon,
+							(x - refreshIcon.getWidth() * 0.5f), 550, txtPaint);
 				}
 			} finally {
 				if (c != null)
@@ -557,14 +678,17 @@ public class FlickrService extends WallpaperService {
 		 */
 		private Photo choosePhoto(List<Photo> photos) {
 			Log.v(TAG, "Choosing a photo from amoungst those with URLs");
-			
-			for(int i=0;i<photos.size();i++){
-				if (photos.get(i).hiResImg_url == null || photos.get(i).medResImg_url == null || photos.get(i).smallResImg_url == null) {
+
+			for (int i = 0; i < photos.size(); i++) {
+				if (photos.get(i).hiResImg_url == null
+						|| photos.get(i).medResImg_url == null
+						|| photos.get(i).smallResImg_url == null) {
 					photos.remove(i);
 				}
 			}
 			if (photos.size() > 1) {
-				cachedPhoto= photos.get(randomWheel.nextInt(photos.size() - 1));
+				cachedPhoto = photos
+						.get(randomWheel.nextInt(photos.size() - 1));
 				return cachedPhoto;
 			}
 			return photos.get(0);
@@ -583,9 +707,10 @@ public class FlickrService extends WallpaperService {
 			photoSearch.with("tags", placeNameTag);
 			photoSearch.with("sort", "interestingness-desc");
 			photoSearch.with("media", "photos");
-			photoSearch.with("extras", "url_s,url_m,original_format,path_alias,url_sq,url_t");
+			photoSearch.with("extras",
+					"url_s,url_m,original_format,path_alias,url_sq,url_t");
 			photoSearch.with("per_page", "50");
-			
+
 			List<Photo> list = photoSearch.fetchStructuredDataList();
 
 			if (list.size() > 1) {
@@ -680,26 +805,18 @@ public class FlickrService extends WallpaperService {
 		private final Runnable mDrawWallpaper = new Runnable() {
 			public void run() {
 				if (currentlyVisibile) {
-					drawInitialNotification();
+					drawInitialLoadingNotification();
+//					loadMockImages();
 
 					try {
-						location = obtainLocation();
+						 location = obtainLocation();
 					} catch (ConnectException e) {
-						location = null;
-						drawErrorNotification("Could not connect to the internet to find your location");
+						 location = null;
+						 drawErrorNotification("Could not connect to the internet to find your location");
 					}
-
+					
 					if (location != null) {
-						drawDetailedLoadingNotification(location.second);
-						try {
-							requestAndCacheImage(location.first,
-									location.second);
-							drawCachedImage();
-						} catch (IllegalStateException e) {
-							Log.e(TAG, e.getMessage());
-							drawErrorNotification(e.getMessage());
-						}
-						
+						requestAndDrawImage();
 					}
 
 				} else {
@@ -707,8 +824,47 @@ public class FlickrService extends WallpaperService {
 					mHandler.postDelayed(mDrawWallpaper, 600);
 				}
 			}
+
+			private void requestAndDrawImage() {
+				drawDetailedLoadingNotification(location.second);
+				
+				try {
+					requestAndCacheImage(location.first,location.second);
+
+					if (alignImgInMiddle) {
+						if (cachedBitmap.getWidth() > cachedBitmap.getHeight()) {
+							drawLandscapeFramedImage();
+						} else {
+							drawPortraitFramedImage();
+						}
+					} else {
+						drawScalingImageNotification("Stretching images across dashboards");
+						
+						try {
+							setWallpaper(cachedBitmap);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+
+				} catch (IllegalStateException e) {
+					Log.e(TAG, e.getMessage());
+					drawErrorNotification(e.getMessage());
+				}
+			}
 		};
-		
+
+		protected void loadMockImages() {
+			cachedBitmap = BitmapFactory.decodeResource(getResources(),
+					R.drawable.mock_port_medium);
+			WallpaperManager wm = WallpaperManager
+					.getInstance(getApplicationContext());
+			cachedBitmap = scaleImage(cachedBitmap,
+					wm.getDesiredMinimumWidth(), wm.getDesiredMinimumHeight());
+			// cachedBitmap = BitmapFactory.decodeResource(getResources(),
+			// R.drawable.mock_port_medium);
+		}
+
 		private final Handler mHandler = new Handler();
 
 		private static final String PREF_SCALE_TYPE_FULL = "full";
@@ -726,7 +882,7 @@ public class FlickrService extends WallpaperService {
 		private long lastSync = 0;
 
 		private long cachedImgTopMargin = 0;
-		
+
 		private boolean alignImgInMiddle = true;
 
 		private SharedPreferences mPrefs;
@@ -750,21 +906,21 @@ public class FlickrService extends WallpaperService {
 		private Paint bgPaint;
 
 		private Bitmap frame;
-		
+
 		private boolean refreshOnClick = false;
-		
+
 		public static final int LANDSCAPE_FRAME_LEFT_MARGIN = 24;
 
 		public static final int LANDSCAPE_FRAME_TOP_MARGIN = 110;
 
-		public static final int LANDSCAPE_IMG_LEFT_MARGIN =  69;
+		public static final int LANDSCAPE_IMG_LEFT_MARGIN = 69;
 
 		public static final int LANDSCAPE_IMG_TOP_MARGIN = 154;
-		
+
 		private static final float PORTRAIT_IMG_TOP_MARGIN = 118;
 
 		private static final int PORTRAIT_IMG_LEFT_MARGIN = 97;
-		
+
 		private static final int PORTRAIT_FRAME_TOP_MARGIN = 70;
 
 		private static final int PORTRAIT_FRAME_LEFT_MARGIN = 47;
@@ -773,6 +929,7 @@ public class FlickrService extends WallpaperService {
 
 	private static Bitmap cachedBitmap;
 	public static final String TAG = FlickrService.class.getSimpleName();
-	
+
 	public static final String SHARED_PREFS_NAME = "flickrSettings";
+
 }
