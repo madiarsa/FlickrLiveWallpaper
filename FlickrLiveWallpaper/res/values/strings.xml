@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="hello">Hello World, FlickrSettings!</string>
-    <string name="app_name">FlickrLiveWallpaper</string>
-<string name="flickr_service_label">Flickr</string>
-<string name="author">Novoda ltd</string>
-<string name="flickr_settings">Settings</string>
-<string name="flickr_settings_title">Wallpaper settings</string>
-<string name="flickr_settings_summary">Scroll the whole picture on your dashboard or scale it down.</string>
-<string name="description">Simple flickr wallpaper which adapts itself to your location and time</string>
+	<string name="app_name">FlickrLiveWallpaper</string>
+	<string name="description">Location based photos! Urban explorers are now Flickr explorers!</string>
+	<string name="flickr_service_label">Flickr Explorer</string>
+	<string name="author">Novoda</string>
+	<string name="flickr_settings">Wallpaper Settings</string>
+	<string name="flickr_settings_size_title">Display Type</string>
+	<string name="flickr_settings_tap_title">Action on Wallpaper Tap</string>
+	<string name="flickr_settings_size_summary">Display in a nice frame or across your whole dashboard.</string>
 </resources>
             

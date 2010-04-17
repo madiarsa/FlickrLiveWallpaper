@@ -20,9 +20,15 @@
 
     <ListPreference
             android:key="flickr_scale"
-            android:title="@string/flickr_settings_title"
-            android:summary="@string/flickr_settings_summary"
+            android:title="@string/flickr_settings_size_title"
+            android:summary="@string/flickr_settings_size_summary"
             android:entries="@array/flickr_scaling_options"
             android:entryValues="@array/flickr_scaling_options_values" />
+            
+    <ListPreference
+            android:key="flickr_action"
+            android:title="@string/flickr_settings_tap_title"
+            android:entries="@array/flickr_action_tap_options"
+            android:entryValues="@array/flickr_action_tap_values" />            
 
 </PreferenceScreen>

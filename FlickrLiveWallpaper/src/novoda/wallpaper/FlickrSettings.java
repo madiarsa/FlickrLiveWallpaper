@@ -10,11 +10,9 @@ public class FlickrSettings extends PreferenceActivity implements
 	@Override
 	protected void onCreate(Bundle icicle) {
 		super.onCreate(icicle);
-		getPreferenceManager().setSharedPreferencesName(
-				FlickrService.SHARED_PREFS_NAME);
+		getPreferenceManager().setSharedPreferencesName(FlickrService.SHARED_PREFS_NAME);
 		addPreferencesFromResource(R.xml.flickr_settings);
-		getPreferenceManager().getSharedPreferences()
-				.registerOnSharedPreferenceChangeListener(this);
+		getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
 	}
 
 	@Override

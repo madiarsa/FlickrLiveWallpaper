@@ -37,8 +37,7 @@
             android:name=".FlickrSettings"
             android:theme="@android:style/Theme.Light.WallpaperSettings"
             android:launchMode="singleTop"
-            android:exported="true">
-        </activity>
+            android:exported="true" />
 	</application>
 
 </manifest> 
