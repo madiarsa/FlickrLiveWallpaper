@@ -33,6 +33,7 @@ import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.service.wallpaper.WallpaperService;
@@ -82,10 +83,6 @@ public class FlickrService extends WallpaperService {
 
     private static final int READ_TIMEOUT = 60 * 1000;
 
-    private String lastKnownDisplaySetting;
-
-    private String lastKnownTapSetting;
-    
     protected static final String HTTP_USER_AGENT = "Android/FlickerLiveWallpaper";
 
     class FlickrEngine extends Engine implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -101,14 +98,7 @@ public class FlickrService extends WallpaperService {
         }
         
         public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
-            Log.i(TAG, "pref changed: key=" + key );
-            String displaySelection = prefs.getString(PREF_SCALE_TYPE, PREF_SCALE_TYPE_MIDDLE);
-            String tapSelection = prefs.getString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
-
-            if (lastKnownDisplaySetting != displaySelection || lastKnownTapSetting != tapSelection ) {
-                Log.i(TAG, "pref changed");
                 mHandler.post(mDrawWallpaper);
-            }
         }
         
         @Override
@@ -121,9 +111,6 @@ public class FlickrService extends WallpaperService {
             mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, 0);
             mPrefs.registerOnSharedPreferenceChangeListener(this);
             onSharedPreferenceChanged(mPrefs, null);
-            
-            lastKnownDisplaySetting = mPrefs.getString(PREF_SCALE_TYPE,PREF_SCALE_TYPE_MIDDLE);
-            lastKnownTapSetting = mPrefs.getString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
 
             displayWidth = dm.getWidth();
             displayHeight = dm.getHeight();
@@ -190,19 +177,19 @@ public class FlickrService extends WallpaperService {
                 boolean resultRequested) {
             Intent intent = null;
             Log.i(TAG, "An action going on" + action);
-
             if (action.equals(WallpaperManager.COMMAND_TAP)) {
-                // if (refreshOnClick == true) {
-                // Log.i(TAG, "Refresh on click");
-                // refreshOnClick = false;
-                // mHandler.post(mDrawWallpaper);
-                // } else {
-                // final String url = cachedPhoto.getFullFlickrUrl();
-                // Log.i(TAG, "Browsing to image=[" + url + "]");
-                // intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                // intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                // startActivity(intent);
-                // }
+                
+                String tappingOpt =  mPrefs.getString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
+
+                if(tappingOpt.equals(PREF_TAP_TYPE_VISIT)){
+                    final String url = cachedPhoto.getFullFlickrUrl();
+                    Log.i(TAG, "Browsing to image=[" + url + "]");
+                    intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                }else{
+                    mHandler.post(mDrawWallpaper);
+                }
             }
 
             return super.onCommand(action, x, y, z, extras, resultRequested);
@@ -239,11 +226,12 @@ public class FlickrService extends WallpaperService {
          */
         private Bitmap retrievePhoto(Photo photo) throws IllegalStateException {
             URL photoUrl = null;
-
+            final boolean FRAMED =  mPrefs.getString(PREF_DISPLAY_TYPE_FRAME, PREF_DISPLAY_TYPE_FRAME).equals(PREF_DISPLAY_TYPE_FRAME);
+            
             try {
                 Log.d(TAG, "Requesting static image from Flickr=[" + photo.getUrl() + "]");
 
-                if (alignImgInMiddle) {
+                if (FRAMED) {
                     photoUrl = new URL(photo.getUrl());
                 } else {
                     photoUrl = new URL(photo.getUrl("large"));
@@ -381,8 +369,9 @@ public class FlickrService extends WallpaperService {
             final int scaledWidth;
             final int scaledHeight;
 
-            if (alignImgInMiddle) {
-
+            final boolean FRAMED = mPrefs.getString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME).equals(PREF_DISPLAY_TYPE_FRAME);
+            
+            if (FRAMED) {
                 scale = Math.min((float)width / (float)bitmapWidth, (float)height
                         / (float)bitmapHeight);
 
@@ -411,7 +400,7 @@ public class FlickrService extends WallpaperService {
              * screenDivisions = totalScreenHeight/BitmapHeight cachedTopMargin
              * = screenDivisions - (BitmapHeight*0.5)
              */
-            if (alignImgInMiddle) {
+            if (FRAMED) {
                 final float screenDividedByPic = Math
                         .min((float)displayHeight, (float)scaledHeight);
                 cachedImgTopMargin = Math.round((screenDividedByPic - (float)scaledHeight * 0.5));
@@ -784,11 +773,10 @@ public class FlickrService extends WallpaperService {
 
             private void requestAndDrawImage() {
                 drawDetailedLoadingNotification(location.second);
-
+                final boolean FRAMED = mPrefs.getString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME).equals(PREF_DISPLAY_TYPE_FRAME);
                 try {
                     requestAndCacheImage(location.first, location.second);
-
-                    if (alignImgInMiddle) {
+                    if (FRAMED) {
                         if (cachedBitmap.getWidth() > cachedBitmap.getHeight()) {
                             drawLandscapeFramedImage();
                         } else {
@@ -825,9 +813,9 @@ public class FlickrService extends WallpaperService {
 
         private static final String PREF_SCALE_TYPE_FULL = "full";
 
-        private static final String PREF_SCALE_TYPE_MIDDLE = "middle";
+        private static final String PREF_DISPLAY_TYPE_FRAME = "middle";
 
-        private static final String PREF_SCALE_TYPE = "flickr_scale";
+        private static final String PREF_DISPLAY_TYPE = "flickr_scale";
         
         private static final String PREF_TAP_TYPE = "flickr_action";
         
@@ -844,8 +832,6 @@ public class FlickrService extends WallpaperService {
         private long lastSync = 0;
 
         private long cachedImgTopMargin = 0;
-
-        private boolean alignImgInMiddle = true;
 
         private final Random randomWheel = new Random();
 
