@@ -82,6 +82,10 @@ public class FlickrService extends WallpaperService {
 
     private static final int READ_TIMEOUT = 60 * 1000;
 
+    private String lastKnownDisplaySetting;
+
+    private String lastKnownTapSetting;
+    
     protected static final String HTTP_USER_AGENT = "Android/FlickerLiveWallpaper";
 
     class FlickrEngine extends Engine implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -89,7 +93,7 @@ public class FlickrService extends WallpaperService {
         private static final String USER_AGENT = "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_4_11; ar) AppleWebKit/525.18 (KHTML, like Gecko) Version/3.1.2 Safari/525.22";
 
         private SharedPreferences mPrefs;
-        
+
         FlickrEngine() {
             mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, 0);
             mPrefs.registerOnSharedPreferenceChangeListener(this);
@@ -98,26 +102,14 @@ public class FlickrService extends WallpaperService {
         
         public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
             Log.i(TAG, "pref changed: key=" + key );
-            String scaleSetting = prefs.getString(PREF_SCALE_TYPE, PREF_SCALE_TYPE_MIDDLE);
+            String displaySelection = prefs.getString(PREF_SCALE_TYPE, PREF_SCALE_TYPE_MIDDLE);
+            String tapSelection = prefs.getString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
 
-            boolean beforePrefCalled = alignImgInMiddle;
-
-            if (scaleSetting.equals(PREF_SCALE_TYPE_FULL)) {
-                alignImgInMiddle = false;
-            } else {
-                alignImgInMiddle = true;
-            }
-
-            if (!(alignImgInMiddle == beforePrefCalled)) {
+            if (lastKnownDisplaySetting != displaySelection || lastKnownTapSetting != tapSelection ) {
                 Log.i(TAG, "pref changed");
                 mHandler.post(mDrawWallpaper);
             }
         }
-//        private static final String PREF_TAP_TYPE = "flickr_action";
-//        
-//        private static final String PREF_TAP_TYPE_REFRESH = "refeshOnClick";
-//
-//        private static final String PREF_TAP_TYPE_VISIT = "vistOnClick";  
         
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
@@ -126,18 +118,12 @@ public class FlickrService extends WallpaperService {
             super.onCreate(surfaceHolder);
             Display dm = ((WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
             
-            
-            
             mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, 0);
             mPrefs.registerOnSharedPreferenceChangeListener(this);
             onSharedPreferenceChanged(mPrefs, null);
             
-            if(mPrefs.getString(PREF_SCALE_TYPE, "unset").equals("unset")){
-                Editor editor = mPrefs.edit();
-                editor.putString(PREF_SCALE_TYPE, PREF_SCALE_TYPE_MIDDLE);
-                editor.putString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
-                editor.commit();
-            }
+            lastKnownDisplaySetting = mPrefs.getString(PREF_SCALE_TYPE,PREF_SCALE_TYPE_MIDDLE);
+            lastKnownTapSetting = mPrefs.getString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
 
             displayWidth = dm.getWidth();
             displayHeight = dm.getHeight();
