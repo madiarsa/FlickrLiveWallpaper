@@ -91,12 +91,6 @@ public class FlickrService extends WallpaperService {
 
         private SharedPreferences mPrefs;
 
-        FlickrEngine() {
-            mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, 0);
-            mPrefs.registerOnSharedPreferenceChangeListener(this);
-            onSharedPreferenceChanged(mPrefs, null);
-        }
-        
         public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
                 mHandler.post(mDrawWallpaper);
         }
@@ -108,7 +102,7 @@ public class FlickrService extends WallpaperService {
             super.onCreate(surfaceHolder);
             Display dm = ((WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
             
-            mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, 0);
+            mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, MODE_PRIVATE);
             mPrefs.registerOnSharedPreferenceChangeListener(this);
             onSharedPreferenceChanged(mPrefs, null);
 
@@ -180,15 +174,16 @@ public class FlickrService extends WallpaperService {
             if (action.equals(WallpaperManager.COMMAND_TAP)) {
                 
                 String tappingOpt =  mPrefs.getString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
-
-                if(tappingOpt.equals(PREF_TAP_TYPE_VISIT)){
+                
+                if(tappingOpt.equals(PREF_TAP_TYPE_REFRESH) || errorShown){
+                    errorShown=false;
+                    mHandler.post(mDrawWallpaper);
+                }else{
                     final String url = cachedPhoto.getFullFlickrUrl();
                     Log.i(TAG, "Browsing to image=[" + url + "]");
                     intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(intent);
-                }else{
-                    mHandler.post(mDrawWallpaper);
                 }
             }
 
@@ -506,7 +501,7 @@ public class FlickrService extends WallpaperService {
             Log.e(TAG, error);
             float x = displayMiddleX;
             float y = 180;
-            refreshOnClick = true;
+            errorShown = true;
             cachedPhoto = null;
             if (cachedBitmap != null) {
                 cachedBitmap.recycle();
@@ -853,7 +848,7 @@ public class FlickrService extends WallpaperService {
 
         private Bitmap frame;
 
-        private boolean refreshOnClick = false;
+        private boolean errorShown = false;
 
         public static final int LANDSCAPE_FRAME_LEFT_MARGIN = 24;
 
