@@ -34,7 +34,7 @@
 		</service>
 		<activity
             android:label="@string/flickr_settings"
-            android:name=".FlickrSettings"
+            android:name=".Settings"
             android:theme="@android:style/Theme.Light.WallpaperSettings"
             android:launchMode="singleTop"
             android:exported="true" />

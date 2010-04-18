@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<resources> 
+    <declare-stylable name="PreferenceTextView"> 
+        <attr name="android:text" /> 
+    </declare-stylable> 
+</resources>

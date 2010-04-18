@@ -2,9 +2,13 @@ package novoda.wallpaper.flickr;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.ListPreference;
+import android.preference.Preference;
 import android.preference.PreferenceActivity;
+import android.preference.Preference.OnPreferenceChangeListener;
+import android.widget.TextView;
 
-public class FlickrSettings extends PreferenceActivity implements
+public class Settings extends PreferenceActivity implements
 		SharedPreferences.OnSharedPreferenceChangeListener {
 
 	@Override
@@ -13,6 +17,7 @@ public class FlickrSettings extends PreferenceActivity implements
 		getPreferenceManager().setSharedPreferencesName(FlickrLiveWallpaper.SHARED_PREFS_NAME);
 		addPreferencesFromResource(R.xml.flickr_settings);
 		getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
+		
 	}
 
 	@Override

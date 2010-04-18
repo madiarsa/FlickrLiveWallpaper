@@ -2,7 +2,7 @@
 <!-- icon from http://www.blogperfume.com/social-media-icons-pack-in-3-sizes-for-download/ under CC license -->
 <wallpaper
 	xmlns:android="http://schemas.android.com/apk/res/android"
-	android:settingsActivity="novoda.wallpaper.FlickrSettings"	
+	android:settingsActivity="novoda.wallpaper.flickr.Settings"	
 	android:author="@string/author"
 	android:thumbnail="@drawable/ic_logo_flickr"
 	android:description="@string/description"  />

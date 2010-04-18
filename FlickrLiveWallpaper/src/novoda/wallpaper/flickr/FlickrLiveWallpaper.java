@@ -89,7 +89,6 @@ public class FlickrLiveWallpaper extends WallpaperService {
                 Log.i(TAG, "Shared Preferences changed: " + key);
                 mHandler.post(mDrawWallpaper);
             }
-            
         }
 
         @Override
@@ -102,6 +101,18 @@ public class FlickrLiveWallpaper extends WallpaperService {
             mPrefs = FlickrLiveWallpaper.this.getSharedPreferences(SHARED_PREFS_NAME, MODE_PRIVATE);
             mPrefs.registerOnSharedPreferenceChangeListener(this);
             onSharedPreferenceChanged(mPrefs, null);
+
+            if(!mPrefs.contains(PREF_TAP_TYPE)){
+                Editor edit = mPrefs.edit();
+                edit.putString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
+                edit.commit();
+            }
+
+            if(!mPrefs.contains(PREF_DISPLAY_TYPE)){
+                Editor edit = mPrefs.edit();
+                edit.putString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME);
+                edit.commit();
+            }
 
             displayWidth = dm.getWidth();
             displayHeight = dm.getHeight();
@@ -119,11 +130,9 @@ public class FlickrLiveWallpaper extends WallpaperService {
             txtPaint.setTypeface(typeFace);
             txtPaint.setTextAlign(Paint.Align.CENTER);
 
-            final Bitmap bg = BitmapFactory.decodeResource(getResources(), getResources()
-                    .getIdentifier("bg_wallpaper_pattern", "drawable", "novoda.wallpaper"));
+            final Bitmap bg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_wallpaper_pattern);
 
-            BitmapShader mShader1 = new BitmapShader(bg, Shader.TileMode.REPEAT,
-                    Shader.TileMode.REPEAT);
+            BitmapShader mShader1 = new BitmapShader(bg, Shader.TileMode.REPEAT,  Shader.TileMode.REPEAT);
             bg.recycle();
 
             bgPaint = new Paint();
@@ -321,8 +330,7 @@ public class FlickrLiveWallpaper extends WallpaperService {
                 if (c != null && cachedBitmap != null) {
                     Log.i(TAG, "Drawing a Framed Portrait image");
                     c.drawPaint(bgPaint);
-                    frame = BitmapFactory.decodeResource(getResources(), getResources()
-                            .getIdentifier("bg_frame_portrait", "drawable", "novoda.wallpaper"));
+                    frame = BitmapFactory.decodeResource(getResources(), R.drawable.bg_frame_portrait);
                     c.drawBitmap(frame, PORTRAIT_FRAME_LEFT_MARGIN, PORTRAIT_FRAME_TOP_MARGIN,
                             new Paint());
                     c.drawBitmap(cachedBitmap, PORTRAIT_IMG_LEFT_MARGIN, PORTRAIT_IMG_TOP_MARGIN,
@@ -344,8 +352,7 @@ public class FlickrLiveWallpaper extends WallpaperService {
                     Log.i(TAG, "Drawing a Framed Landscape image");
 
                     c.drawPaint(bgPaint);
-                    frame = BitmapFactory.decodeResource(getResources(), getResources()
-                            .getIdentifier("bg_frame_landscape", "drawable", "novoda.wallpaper"));
+                    frame = BitmapFactory.decodeResource(getResources(), R.drawable.bg_frame_landscape);
                     c.drawBitmap(frame, LANDSCAPE_FRAME_LEFT_MARGIN, LANDSCAPE_FRAME_TOP_MARGIN,
                             new Paint());
                     c.drawBitmap(cachedBitmap, LANDSCAPE_IMG_LEFT_MARGIN, LANDSCAPE_IMG_TOP_MARGIN,
@@ -431,12 +438,9 @@ public class FlickrLiveWallpaper extends WallpaperService {
             try {
                 c = holder.lockCanvas();
                 c.drawPaint(bgPaint);
-                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(),
-                        getResources().getIdentifier("ic_logo_flickr", "drawable",
-                                "novoda.wallpaper"));
+                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(), R.drawable.ic_logo_flickr);
                 if (c != null) {
-                    c.drawBitmap(decodeResource, (x - decodeResource.getWidth() * 0.5f), y,
-                            txtPaint);
+                    c.drawBitmap(decodeResource, (x - decodeResource.getWidth() * 0.5f), y,                      txtPaint);
                     c.drawText("Finding your location", x, y + 108, txtPaint);
                 }
             } finally {
@@ -461,9 +465,7 @@ public class FlickrLiveWallpaper extends WallpaperService {
             try {
                 c = holder.lockCanvas();
                 c.drawPaint(bgPaint);
-                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(),
-                        getResources().getIdentifier("ic_logo_flickr", "drawable",
-                                "novoda.wallpaper"));
+                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(), R.drawable.ic_logo_flickr);
                 if (c != null) {
                     c.drawBitmap(decodeResource, (x - decodeResource.getWidth() * 0.5f), y,
                             txtPaint);
@@ -525,12 +527,8 @@ public class FlickrLiveWallpaper extends WallpaperService {
             try {
                 c = holder.lockCanvas();
                 c.drawPaint(bgPaint);
-                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(),
-                        getResources().getIdentifier("ic_smile_sad_48", "drawable",
-                                "novoda.wallpaper"));
-                final Bitmap refreshIcon = BitmapFactory.decodeResource(getResources(),
-                        getResources().getIdentifier("ic_refresh_48", "drawable",
-                                "novoda.wallpaper"));
+                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(),R.drawable.ic_smile_sad_48);
+                final Bitmap refreshIcon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_refresh_48);
                 if (c != null) {
 
                     c.drawBitmap(decodeResource, (x - decodeResource.getWidth() * 0.5f), y,

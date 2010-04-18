@@ -8,5 +8,7 @@
 	<string name="flickr_settings_size_title">Display Type</string>
 	<string name="flickr_settings_tap_title">Action on Wallpaper Tap</string>
 	<string name="flickr_settings_size_summary">Display in a nice frame or across your whole dashboard.</string>
+	<string name="flickr_settings_readme_title">Attention Flickr Explorers!</string>
+	<string name="flickr_settings_info">Downloading photos uses bandwidth! \nSome phone packages allow more internet downloads than others. Wifi is not counted in your monthly limit so be sure to explore through web access points when you get the opportunity.</string>
 </resources>
             
