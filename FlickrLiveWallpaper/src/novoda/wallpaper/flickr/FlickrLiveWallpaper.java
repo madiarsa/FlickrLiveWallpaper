@@ -6,12 +6,35 @@ import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.text.DecimalFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Random;
+
+import org.apache.http.Header;
+import org.apache.http.HttpMessage;
+import org.apache.http.HttpRequest;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.HttpVersion;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.params.ConnManagerParams;
+import org.apache.http.conn.params.ConnPerRouteBean;
+import org.apache.http.conn.scheme.PlainSocketFactory;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.impl.client.AbstractHttpClient;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.params.HttpProtocolParams;
+import org.apache.http.protocol.HTTP;
 
 import novoda.net.Flickr;
 import novoda.net.GeoNamesAPI;
@@ -77,6 +100,31 @@ public class FlickrLiveWallpaper extends WallpaperService {
     protected static final String HTTP_USER_AGENT = "Android/FlickerLiveWallpaper";
 
     private static boolean drawingWallpaper = false;
+    
+    static {
+        setupHttpClient();
+    }
+    
+    private static final int CONNECTION_TIMEOUT = 10 * 1000;
+    private static final int MAX_CONNECTIONS = 6;
+    
+    private static AbstractHttpClient httpClient;
+    private static void setupHttpClient() {
+        BasicHttpParams httpParams = new BasicHttpParams();
+
+        ConnManagerParams.setTimeout(httpParams, CONNECTION_TIMEOUT);
+        ConnManagerParams.setMaxConnectionsPerRoute(httpParams, new ConnPerRouteBean(MAX_CONNECTIONS));
+        ConnManagerParams.setMaxTotalConnections(httpParams, MAX_CONNECTIONS);
+        HttpProtocolParams.setVersion(httpParams, HttpVersion.HTTP_1_1);
+        HttpProtocolParams.setUserAgent(httpParams, HTTP_USER_AGENT);
+
+        SchemeRegistry schemeRegistry = new SchemeRegistry();
+        schemeRegistry.register(new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
+
+        ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(httpParams, schemeRegistry);
+        httpClient = new DefaultHttpClient(cm, httpParams);
+    }
+    
 
     class FlickrEngine extends Engine implements SharedPreferences.OnSharedPreferenceChangeListener {
 
@@ -216,8 +264,7 @@ public class FlickrLiveWallpaper extends WallpaperService {
         private Pair<Location, String> obtainLocation() throws ConnectException {
             Log.d(TAG, "Requesting photo details based on approximate location");
             final Location location = getRecentLocation();
-            return new Pair<Location, String>(location, geoNamesAPI.getNearestPlaceName(df
-                    .format(location.getLatitude()), df.format(location.getLongitude())));
+            return new Pair<Location, String>(location, geoNamesAPI.getNearestPlaceName(df.format(location.getLatitude()), df.format(location.getLongitude()),httpClient));
         }
 
         /*
@@ -266,60 +313,58 @@ public class FlickrLiveWallpaper extends WallpaperService {
 
         private Bitmap retrieveBitmap(URL photoUrl) {
             Bitmap bitmap = null;
-            HttpURLConnection connection = null;
-            System.setProperty("http.keepAlive", "false");
-
-            /*
-             * HACK: Related to Android #Issue 6850 HttpURLConnection has
-             * provided mixed reliability in Android and so looping in this
-             * manor ensures a good connection if it is available. An
-             * alternative is setting System.setProperty("http.keepAlive",
-             * "false"); but I did not see results from this.
-             */
-            int http_response_code = -1;
-            int retries = 0;
-            do {
-                if (retries > 0) {
-                    Log.e(TAG, "retrying to establish connection: " + retries);
-                }
-
-                try {
-                    connection = (HttpURLConnection)photoUrl.openConnection();
-                    connection.addRequestProperty("User-Agent", USER_AGENT);
-                    connection.setConnectTimeout(CONNECTION_TIMEOUT);
-                    connection.setDoInput(true);
-                    connection.connect();
-                    http_response_code = connection.getResponseCode();
-                } catch (IOException e) {
-                    Log.e(TAG, "Error connecting to service", e);
-                    http_response_code = -1;
-                }
-
-                if (http_response_code == HttpURLConnection.HTTP_OK) {
-                    try {
-                        Log.i(TAG, "Response code:[" + http_response_code + "] Msg:["
-                                + connection.getResponseMessage() + "] Type:["
-                                + connection.getContentType() + "] length:["
-                                + connection.getContentLength() +"]");
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    Log.i(TAG, "Headers: " + connection.getHeaderFields().entrySet());
-                    retries = 10;
-                } else {
-                    Log.d(TAG, "Unsuccessful Connection response: " + http_response_code);
-                }
-
-                retries++;
-            } while (retries < 10);
-
+            HttpResponse response = getHTTPResponse(photoUrl);
+            
             try {
-                InputStream input = connection.getInputStream();
+                InputStream input = response.getEntity().getContent();
                 bitmap = BitmapFactory.decodeStream(input);
             } catch (IOException e) {
                 Log.e(TAG, "Could not retrieve bitmap from resulting httpResponse", e);
             }
             return bitmap;
+        }
+
+        private HttpResponse getHTTPResponse(URL photoUrl) {
+            HttpGet request = null;
+            HttpResponse response = null;
+
+            try {
+                request = new HttpGet(photoUrl.toURI());
+            } catch (URISyntaxException e) {
+                Log.e(TAG, "Could not create GetRequest: " + e.getMessage(), e);
+            }
+
+//          /*
+//          * HACK: Related to Android #Issue 6850 HttpURLConnection has
+//          * provided mixed reliability in Android and so looping in this
+//          * manor ensures a good connection if it is available. An
+//          * alternative is setting System.setProperty("http.keepAlive",
+//          * "false"); but I did not see results from this.
+//          */
+            System.setProperty("http.keepAlive", "false");
+            try {
+                response = httpClient.execute(request);
+            } catch (ClientProtocolException e) {
+                Log.e(TAG, "Client Protocol exception: " + e.getMessage(), e);
+            } catch (IOException e) {
+                Log.e(TAG, "IOException exception: " + e.getMessage(), e);
+            }
+            
+            if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+                Log.i(TAG, "Response code:[" + HttpStatus.SC_OK + "] Msg:["
+                        + response.getStatusLine().getReasonPhrase() + "] Type:["
+                        + response.getEntity().getContentType() + "] length:["
+                        + response.getEntity().getContentLength() + "]");
+                
+//                List<Header> li = Arrays.asList(response.getAllHeaders());
+//                for(Header head : li){
+//                    Log.i(TAG, "Header: " + head.getName() + " values: " + head.getValue());
+//                }
+//                
+            } else {
+                Log.e(TAG, "Unsuccessful Connection response: " + response.getStatusLine().getStatusCode());
+            }
+            return response;
         }
 
         private void drawPortraitFramedImage() {

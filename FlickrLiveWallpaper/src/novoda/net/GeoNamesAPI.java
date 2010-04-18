@@ -28,33 +28,7 @@ import android.util.Log;
 
 public class GeoNamesAPI {
 
-	static {
-		setupHttpClient();
-	}
-
-	/*
-	 * Gracefully taken from droidfu - rockon Mathias
-	 * github.com/kaeppler/droid-fu/
-	 */
-	private static void setupHttpClient() {
-		BasicHttpParams httpParams = new BasicHttpParams();
-		ConnManagerParams.setTimeout(httpParams, CONNECTION_TIMEOUT);
-		ConnManagerParams.setMaxConnectionsPerRoute(httpParams,
-				new ConnPerRouteBean(MAX_CONNECTIONS));
-		ConnManagerParams.setMaxTotalConnections(httpParams, MAX_CONNECTIONS);
-		HttpProtocolParams.setVersion(httpParams, HttpVersion.HTTP_1_1);
-		HttpProtocolParams.setUserAgent(httpParams, HTTP_USER_AGENT);
-		SchemeRegistry schemeRegistry = new SchemeRegistry();
-		schemeRegistry.register(new Scheme("http", PlainSocketFactory
-				.getSocketFactory(), 80));
-		schemeRegistry.register(new Scheme("https", PlainSocketFactory
-				.getSocketFactory(), 443));
-		ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(
-				httpParams, schemeRegistry);
-		httpClient = new DefaultHttpClient(cm, httpParams);
-	}
-
-	public String getNearestPlaceName(String lat, String lon) throws ConnectException{
+	public String getNearestPlaceName(String lat, String lon, AbstractHttpClient httpClient) throws ConnectException{
 		final HttpGet get = new HttpGet(
 				"http://ws.geonames.org/findNearbyPlaceNameJSON?lat=" + lat
 						+ "&lng=" + lon);
