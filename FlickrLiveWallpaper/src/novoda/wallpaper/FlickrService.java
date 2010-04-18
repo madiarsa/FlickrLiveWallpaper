@@ -73,17 +73,9 @@ public class FlickrService extends WallpaperService {
         super.onCreate();
     }
 
-    private static final int MAX_RETRIES = 5;
-
-    private static final int RETRY_SLEEP_TIME_MILLIS = 3 * 1000;
-
-    private static final int CONNECTION_TIMEOUT = 10 * 1000;
-
-    private static final int MAX_CONNECTIONS = 6;
-
-    private static final int READ_TIMEOUT = 60 * 1000;
-
     protected static final String HTTP_USER_AGENT = "Android/FlickerLiveWallpaper";
+
+    private static boolean drawingWallpaper = false;
 
     class FlickrEngine extends Engine implements SharedPreferences.OnSharedPreferenceChangeListener {
 
@@ -92,16 +84,20 @@ public class FlickrService extends WallpaperService {
         private SharedPreferences mPrefs;
 
         public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
+            if(key != null){
+                Log.i(TAG, "Shared Preferences changed: " + key);
                 mHandler.post(mDrawWallpaper);
+            }
+            
         }
-        
+
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
             Log.i(TAG, "OnCreate");
 
             super.onCreate(surfaceHolder);
             Display dm = ((WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
-            
+
             mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, MODE_PRIVATE);
             mPrefs.registerOnSharedPreferenceChangeListener(this);
             onSharedPreferenceChanged(mPrefs, null);
@@ -159,7 +155,6 @@ public class FlickrService extends WallpaperService {
             if (visible) {
                 if (reSynchNeeded) {
                     mHandler.post(mDrawWallpaper);
-                    lastSync = System.currentTimeMillis();
                 }
             } else {
                 mHandler.removeCallbacks(mDrawWallpaper);
@@ -172,13 +167,13 @@ public class FlickrService extends WallpaperService {
             Intent intent = null;
             Log.i(TAG, "An action going on" + action);
             if (action.equals(WallpaperManager.COMMAND_TAP)) {
-                
-                String tappingOpt =  mPrefs.getString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
-                
-                if(tappingOpt.equals(PREF_TAP_TYPE_REFRESH) || errorShown){
-                    errorShown=false;
+
+                String tappingOpt = mPrefs.getString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
+
+                if (tappingOpt.equals(PREF_TAP_TYPE_REFRESH) || errorShown) {
+                    errorShown = false;
                     mHandler.post(mDrawWallpaper);
-                }else{
+                } else {
                     final String url = cachedPhoto.getFullFlickrUrl();
                     Log.i(TAG, "Browsing to image=[" + url + "]");
                     intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
@@ -221,16 +216,18 @@ public class FlickrService extends WallpaperService {
          */
         private Bitmap retrievePhoto(Photo photo) throws IllegalStateException {
             URL photoUrl = null;
-            final boolean FRAMED =  mPrefs.getString(PREF_DISPLAY_TYPE_FRAME, PREF_DISPLAY_TYPE_FRAME).equals(PREF_DISPLAY_TYPE_FRAME);
-            
-            try {
-                Log.d(TAG, "Requesting static image from Flickr=[" + photo.getUrl() + "]");
+            final boolean FRAMED = mPrefs.getString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME)
+                    .equals(PREF_DISPLAY_TYPE_FRAME);
 
+            try {
                 if (FRAMED) {
                     photoUrl = new URL(photo.getUrl());
                 } else {
-                    photoUrl = new URL(photo.getUrl("large"));
+                    Log.i(TAG, "Image is not framed so it will be a large download");
+                    photoUrl = new URL(photo.getUrl(Photo.ORIGINAL_IMG_URL));
                 }
+
+                Log.d(TAG, "Requesting static image from Flickr=[" + photoUrl + "]");
 
             } catch (MalformedURLException error) {
                 error.printStackTrace();
@@ -239,8 +236,10 @@ public class FlickrService extends WallpaperService {
             Bitmap bitmap = null;
             int retries = 0;
             do {
+                if (retries > 0) {
+                    Log.e(TAG, "Couldn't retrieve Photo retrying: " + retries);
+                }
                 bitmap = retrieveBitmap(photoUrl);
-                Log.i(TAG, "Retrieved: " + retries);
                 retries++;
             } while (bitmap == null && retries < 3);
 
@@ -268,8 +267,12 @@ public class FlickrService extends WallpaperService {
              * "false"); but I did not see results from this.
              */
             int http_response_code = -1;
-            for (int retries = 0; retries < 10; retries++) {
-                Log.i(TAG, "retrying connection: " + retries);
+            int retries = 0;
+            do {
+                if (retries > 0) {
+                    Log.e(TAG, "retrying to establish connection: " + retries);
+                }
+
                 try {
                     connection = (HttpURLConnection)photoUrl.openConnection();
                     connection.addRequestProperty("User-Agent", USER_AGENT);
@@ -281,12 +284,13 @@ public class FlickrService extends WallpaperService {
                     Log.e(TAG, "Error connecting to service", e);
                     http_response_code = -1;
                 }
+
                 if (http_response_code == HttpURLConnection.HTTP_OK) {
-                    Log.i(TAG, "response code is successful " + http_response_code);
-                    Log.i(TAG, "Content length " + connection.getContentLength());
-                    Log.i(TAG, "Content type: " + connection.getContentType());
                     try {
-                        Log.i(TAG, "Response message: " + connection.getResponseMessage());
+                        Log.i(TAG, "Response code:[" + http_response_code + "] Msg:["
+                                + connection.getResponseMessage() + "] Type:["
+                                + connection.getContentType() + "] length:["
+                                + connection.getContentLength() +"]");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -295,7 +299,9 @@ public class FlickrService extends WallpaperService {
                 } else {
                     Log.d(TAG, "Unsuccessful Connection response: " + http_response_code);
                 }
-            }
+
+                retries++;
+            } while (retries < 10);
 
             try {
                 InputStream input = connection.getInputStream();
@@ -312,7 +318,7 @@ public class FlickrService extends WallpaperService {
             try {
                 c = holder.lockCanvas();
                 if (c != null && cachedBitmap != null) {
-                    Log.i(TAG, "PORTRAIT IMG");
+                    Log.i(TAG, "Drawing a Framed Portrait image");
                     c.drawPaint(bgPaint);
                     frame = BitmapFactory.decodeResource(getResources(), getResources()
                             .getIdentifier("bg_frame_portrait", "drawable", "novoda.wallpaper"));
@@ -322,8 +328,9 @@ public class FlickrService extends WallpaperService {
                             txtPaint);
                 }
             } finally {
-                if (c != null)
+                if (c != null){
                     holder.unlockCanvasAndPost(c);
+                }
             }
         }
 
@@ -333,7 +340,7 @@ public class FlickrService extends WallpaperService {
             try {
                 c = holder.lockCanvas();
                 if (c != null && cachedBitmap != null) {
-                    Log.i(TAG, "LANDSCAPE IMG");
+                    Log.i(TAG, "Drawing a Framed Landscape image");
 
                     c.drawPaint(bgPaint);
                     frame = BitmapFactory.decodeResource(getResources(), getResources()
@@ -344,8 +351,9 @@ public class FlickrService extends WallpaperService {
                             txtPaint);
                 }
             } finally {
-                if (c != null)
+                if (c != null){
                     holder.unlockCanvasAndPost(c);
+                }
             }
         }
 
@@ -364,8 +372,9 @@ public class FlickrService extends WallpaperService {
             final int scaledWidth;
             final int scaledHeight;
 
-            final boolean FRAMED = mPrefs.getString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME).equals(PREF_DISPLAY_TYPE_FRAME);
-            
+            final boolean FRAMED = mPrefs.getString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME)
+                    .equals(PREF_DISPLAY_TYPE_FRAME);
+
             if (FRAMED) {
                 scale = Math.min((float)width / (float)bitmapWidth, (float)height
                         / (float)bitmapHeight);
@@ -430,8 +439,9 @@ public class FlickrService extends WallpaperService {
                     c.drawText("Finding your location", x, y + 108, txtPaint);
                 }
             } finally {
-                if (c != null)
+                if (c != null){
                     holder.unlockCanvasAndPost(c);
+                }
             }
         }
 
@@ -461,8 +471,9 @@ public class FlickrService extends WallpaperService {
                             "Looking for images around " + placeName);
                 }
             } finally {
-                if (c != null)
+                if (c != null){
                     holder.unlockCanvasAndPost(c);
+                }
             }
         }
 
@@ -488,8 +499,9 @@ public class FlickrService extends WallpaperService {
                             txtPaint);
                 }
             } finally {
-                if (c != null)
+                if (c != null){
                     holder.unlockCanvasAndPost(c);
+                }
             }
         }
 
@@ -526,8 +538,9 @@ public class FlickrService extends WallpaperService {
                     c.drawBitmap(refreshIcon, (x - refreshIcon.getWidth() * 0.5f), 550, txtPaint);
                 }
             } finally {
-                if (c != null)
+                if (c != null){
                     holder.unlockCanvasAndPost(c);
+                }
             }
         }
 
@@ -626,7 +639,7 @@ public class FlickrService extends WallpaperService {
             Log.v(TAG, "Choosing a photo from amoungst those with URLs");
 
             for (int i = 0; i < photos.size(); i++) {
-                if (photos.get(i).hiResImg_url == null || photos.get(i).medResImg_url == null
+                if (photos.get(i).origResImg_url == null || photos.get(i).medResImg_url == null
                         || photos.get(i).smallResImg_url == null) {
                     photos.remove(i);
                 }
@@ -741,34 +754,43 @@ public class FlickrService extends WallpaperService {
         /*
          * Main thread of re-execution. Once called, an image will be retrieved
          * and then then drawn. This thread will wait until the canvas is
-         * visible for when a a dialog or preference screen is shown.
+         * visible for when a a dialog or preference screen is shown. The loop
+         * is defensive to ensure requests aren't queued.
          */
         private final Runnable mDrawWallpaper = new Runnable() {
             public void run() {
-                if (currentlyVisibile) {
-                    drawInitialLoadingNotification();
-                    // loadMockImages();
+                if (!drawingWallpaper) {
+                    if (currentlyVisibile) {
+                        Log.i(TAG, "Request to refresh Wallpaper");
+                        drawingWallpaper = true;
+                        drawInitialLoadingNotification();
+                        // loadMockImages();
 
-                    try {
-                        location = obtainLocation();
-                    } catch (ConnectException e) {
-                        location = null;
-                        drawErrorNotification("Could not connect to the internet to find your location");
+                        try {
+                            location = obtainLocation();
+                        } catch (ConnectException e) {
+                            location = null;
+                            drawErrorNotification("Could not connect to the internet to find your location");
+                        }
+
+                        if (location != null) {
+                            requestAndDrawImage();
+                            lastSync = System.currentTimeMillis();
+                        }
+
+                        drawingWallpaper = false;
+                        Log.i(TAG, "Finished Drawing Wallpaper");
+                    } else {
+                        Log.w(TAG, "Queuing a draw request");
+                        mHandler.postDelayed(mDrawWallpaper, 600);
                     }
-
-                    if (location != null) {
-                        requestAndDrawImage();
-                    }
-
-                } else {
-                    // Waiting until wallpaper becomes visible
-                    mHandler.postDelayed(mDrawWallpaper, 600);
                 }
             }
 
             private void requestAndDrawImage() {
                 drawDetailedLoadingNotification(location.second);
-                final boolean FRAMED = mPrefs.getString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME).equals(PREF_DISPLAY_TYPE_FRAME);
+                final boolean FRAMED = mPrefs.getString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME)
+                        .equals(PREF_DISPLAY_TYPE_FRAME);
                 try {
                     requestAndCacheImage(location.first, location.second);
                     if (FRAMED) {
@@ -811,13 +833,13 @@ public class FlickrService extends WallpaperService {
         private static final String PREF_DISPLAY_TYPE_FRAME = "middle";
 
         private static final String PREF_DISPLAY_TYPE = "flickr_scale";
-        
+
         private static final String PREF_TAP_TYPE = "flickr_action";
-        
+
         private static final String PREF_TAP_TYPE_REFRESH = "refeshOnClick";
 
-        private static final String PREF_TAP_TYPE_VISIT = "vistOnClick";       
-        
+        private static final String PREF_TAP_TYPE_VISIT = "vistOnClick";
+
         private int displayWidth;
 
         private int displayHeight;
@@ -865,6 +887,8 @@ public class FlickrService extends WallpaperService {
         private static final int PORTRAIT_FRAME_TOP_MARGIN = 70;
 
         private static final int PORTRAIT_FRAME_LEFT_MARGIN = 47;
+
+        private static final int CONNECTION_TIMEOUT = 10 * 1000;
 
     }
 
