@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest
 	xmlns:android="http://schemas.android.com/apk/res/android"
-	package="novoda.wallpaper"
+	package="novoda.wallpaper.flickr"
 	android:versionCode="6"
 	android:versionName="0.5.0">
 
@@ -25,7 +25,7 @@
 		android:icon="@drawable/icon">
 		<service
 			android:label="@string/flickr_service_label"
-			android:name=".FlickrService"
+			android:name=".FlickrLiveWallpaper"
 			android:permission="android.permission.BIND_WALLPAPER">
 			<intent-filter>
 				<action android:name="android.service.wallpaper.WallpaperService" />

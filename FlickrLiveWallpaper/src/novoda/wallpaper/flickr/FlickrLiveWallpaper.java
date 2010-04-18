@@ -1,5 +1,5 @@
 
-package novoda.wallpaper;
+package novoda.wallpaper.flickr;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,8 +15,9 @@ import java.util.Random;
 
 import novoda.net.Flickr;
 import novoda.net.GeoNamesAPI;
-import novoda.wallpaper.flickr.Photo;
-import novoda.wallpaper.flickr.PhotoSearch;
+import novoda.wallpaper.flickr.R;
+import novoda.wallpaper.flickr.models.Photo;
+import novoda.wallpaper.flickr.models.PhotoSearch;
 import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
@@ -59,7 +60,7 @@ import android.view.WindowManager;
  * You are welcome to use this code in however you see fit.
  *
  */
-public class FlickrService extends WallpaperService {
+public class FlickrLiveWallpaper extends WallpaperService {
 
     @Override
     public Engine onCreateEngine() {
@@ -98,7 +99,7 @@ public class FlickrService extends WallpaperService {
             super.onCreate(surfaceHolder);
             Display dm = ((WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
 
-            mPrefs = FlickrService.this.getSharedPreferences(SHARED_PREFS_NAME, MODE_PRIVATE);
+            mPrefs = FlickrLiveWallpaper.this.getSharedPreferences(SHARED_PREFS_NAME, MODE_PRIVATE);
             mPrefs.registerOnSharedPreferenceChangeListener(this);
             onSharedPreferenceChanged(mPrefs, null);
 
@@ -620,7 +621,7 @@ public class FlickrService extends WallpaperService {
         }
 
         private Location getRecentLocation() {
-            final LocationManager locManager = (LocationManager)FlickrService.this.getBaseContext()
+            final LocationManager locManager = (LocationManager)FlickrLiveWallpaper.this.getBaseContext()
                     .getSystemService(Context.LOCATION_SERVICE);
             Location location = null;
             for (String provider : locManager.getProviders(true)) {
@@ -894,7 +895,7 @@ public class FlickrService extends WallpaperService {
 
     private static Bitmap cachedBitmap;
 
-    public static final String TAG = FlickrService.class.getSimpleName();
+    public static final String TAG = FlickrLiveWallpaper.class.getSimpleName();
 
     public static final String SHARED_PREFS_NAME = "flickrSettings";
 

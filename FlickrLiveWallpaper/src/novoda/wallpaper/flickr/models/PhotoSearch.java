@@ -1,4 +1,4 @@
-package novoda.wallpaper.flickr;
+package novoda.wallpaper.flickr.models;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;

@@ -1,5 +1,5 @@
 
-package novoda.wallpaper.flickr;
+package novoda.wallpaper.flickr.models;
 
 import java.io.IOException;
 import java.io.StringReader;
