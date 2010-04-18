@@ -2,41 +2,38 @@ package novoda.net;
 
 import java.io.IOException;
 import java.net.ConnectException;
+import java.net.URL;
+import java.text.DecimalFormat;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.HttpVersion;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.conn.params.ConnManagerParams;
-import org.apache.http.conn.params.ConnPerRouteBean;
-import org.apache.http.conn.scheme.PlainSocketFactory;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.entity.BufferedHttpEntity;
 import org.apache.http.impl.client.AbstractHttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpProtocolParams;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.ObjectMapper;
 
+import android.location.Location;
 import android.util.Log;
+import android.util.Pair;
 
 public class GeoNamesAPI {
+    
+    WebServiceMgr webSrvMgr = new WebServiceMgr();
+    
+    private DecimalFormat df = new DecimalFormat("#.######");
 
-	public String getNearestPlaceName(String lat, String lon, AbstractHttpClient httpClient) throws ConnectException{
-		final HttpGet get = new HttpGet(
-				"http://ws.geonames.org/findNearbyPlaceNameJSON?lat=" + lat
-						+ "&lng=" + lon);
-
+	public String getNearestPlaceName(String lat, String lon) throws ConnectException{
 		HttpEntity entity = null;
 		JsonNode array = null;
+		
 		try {
-			final HttpResponse response = httpClient.execute(get);
+		    HttpResponse response = webSrvMgr.getHTTPResponse(new URL("http://ws.geonames.org/findNearbyPlaceNameJSON?lat=" + lat
+		            + "&lng=" + lon));
+		    
 			if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
 				array = handleResponse(response);
 				array = array.path("geonames").get(0);
@@ -55,6 +52,17 @@ public class GeoNamesAPI {
 
 		return array.path("name").getTextValue();
 	}
+	
+    /*
+     * Using the GeoNames API establish an approximate location
+     * @return Pair<Location, String>(Location, placeName)
+     */
+    public Pair<Location, String> obtainLocation(Location location) throws ConnectException {
+        Log.d(TAG, "Requesting photo details based on approximate location");
+//        final Location location = getRecentLocation();
+//        return new Pair<Location, String>(location, getNearestPlaceName(df.format(location.getLatitude()), df.format(location.getLongitude()),httpClient));
+        return new Pair<Location, String>(location, getNearestPlaceName(df.format(location.getLatitude()), df.format(location.getLongitude())));
+    }
 
 	public JsonNode handleResponse(HttpResponse response)
 			throws ClientProtocolException, IOException {
@@ -81,13 +89,4 @@ public class GeoNamesAPI {
 
 	private static final String TAG = GeoNamesAPI.class.getSimpleName();
 
-	private static final int MAX_CONNECTIONS = 6;
-
-	private static final int CONNECTION_TIMEOUT = 10 * 1000;
-
-	protected static final String HTTP_CONTENT_TYPE_HEADER = "Content-Type";
-
-	protected static final String HTTP_USER_AGENT = "Android/FlickrLiveWallpaper";
-
-	protected static AbstractHttpClient httpClient;
 }

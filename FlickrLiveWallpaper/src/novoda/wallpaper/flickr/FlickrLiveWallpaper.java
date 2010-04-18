@@ -2,45 +2,11 @@
 package novoda.wallpaper.flickr;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.ConnectException;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.text.DecimalFormat;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
-import java.util.List;
-import java.util.Random;
 
-import org.apache.http.Header;
-import org.apache.http.HttpMessage;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.HttpVersion;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.conn.params.ConnManagerParams;
-import org.apache.http.conn.params.ConnPerRouteBean;
-import org.apache.http.conn.scheme.PlainSocketFactory;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.impl.client.AbstractHttpClient;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.params.HttpProtocolParams;
-import org.apache.http.protocol.HTTP;
-
-import novoda.net.Flickr;
+import novoda.net.FlickrApi;
 import novoda.net.GeoNamesAPI;
-import novoda.wallpaper.flickr.R;
 import novoda.wallpaper.flickr.models.Photo;
-import novoda.wallpaper.flickr.models.PhotoSearch;
 import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
@@ -97,43 +63,16 @@ public class FlickrLiveWallpaper extends WallpaperService {
         super.onCreate();
     }
 
-    protected static final String HTTP_USER_AGENT = "Android/FlickerLiveWallpaper";
-
     private static boolean drawingWallpaper = false;
-    
-    static {
-        setupHttpClient();
-    }
-    
-    private static final int CONNECTION_TIMEOUT = 10 * 1000;
-    private static final int MAX_CONNECTIONS = 6;
-    
-    private static AbstractHttpClient httpClient;
-    private static void setupHttpClient() {
-        BasicHttpParams httpParams = new BasicHttpParams();
-
-        ConnManagerParams.setTimeout(httpParams, CONNECTION_TIMEOUT);
-        ConnManagerParams.setMaxConnectionsPerRoute(httpParams, new ConnPerRouteBean(MAX_CONNECTIONS));
-        ConnManagerParams.setMaxTotalConnections(httpParams, MAX_CONNECTIONS);
-        HttpProtocolParams.setVersion(httpParams, HttpVersion.HTTP_1_1);
-        HttpProtocolParams.setUserAgent(httpParams, HTTP_USER_AGENT);
-
-        SchemeRegistry schemeRegistry = new SchemeRegistry();
-        schemeRegistry.register(new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
-
-        ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager(httpParams, schemeRegistry);
-        httpClient = new DefaultHttpClient(cm, httpParams);
-    }
-    
 
     class FlickrEngine extends Engine implements SharedPreferences.OnSharedPreferenceChangeListener {
 
-        private static final String USER_AGENT = "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_4_11; ar) AppleWebKit/525.18 (KHTML, like Gecko) Version/3.1.2 Safari/525.22";
-
         private SharedPreferences mPrefs;
 
+        private String imgUrl;
+
         public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
-            if(key != null){
+            if (key != null) {
                 Log.i(TAG, "Shared Preferences changed: " + key);
                 mHandler.post(mDrawWallpaper);
             }
@@ -150,13 +89,13 @@ public class FlickrLiveWallpaper extends WallpaperService {
             mPrefs.registerOnSharedPreferenceChangeListener(this);
             onSharedPreferenceChanged(mPrefs, null);
 
-            if(!mPrefs.contains(PREF_TAP_TYPE)){
+            if (!mPrefs.contains(PREF_TAP_TYPE)) {
                 Editor edit = mPrefs.edit();
                 edit.putString(PREF_TAP_TYPE, PREF_TAP_TYPE_VISIT);
                 edit.commit();
             }
 
-            if(!mPrefs.contains(PREF_DISPLAY_TYPE)){
+            if (!mPrefs.contains(PREF_DISPLAY_TYPE)) {
                 Editor edit = mPrefs.edit();
                 edit.putString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME);
                 edit.commit();
@@ -165,8 +104,6 @@ public class FlickrLiveWallpaper extends WallpaperService {
             displayWidth = dm.getWidth();
             displayHeight = dm.getHeight();
             displayMiddleX = displayWidth * 0.5f;
-
-            geoNamesAPI = new GeoNamesAPI();
 
             txtPaint = new Paint();
             txtPaint.setAntiAlias(true);
@@ -178,9 +115,11 @@ public class FlickrLiveWallpaper extends WallpaperService {
             txtPaint.setTypeface(typeFace);
             txtPaint.setTextAlign(Paint.Align.CENTER);
 
-            final Bitmap bg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_wallpaper_pattern);
+            final Bitmap bg = BitmapFactory.decodeResource(getResources(),
+                    R.drawable.bg_wallpaper_pattern);
 
-            BitmapShader mShader1 = new BitmapShader(bg, Shader.TileMode.REPEAT,  Shader.TileMode.REPEAT);
+            BitmapShader mShader1 = new BitmapShader(bg, Shader.TileMode.REPEAT,
+                    Shader.TileMode.REPEAT);
             bg.recycle();
 
             bgPaint = new Paint();
@@ -192,7 +131,6 @@ public class FlickrLiveWallpaper extends WallpaperService {
             if (cachedBitmap != null) {
                 cachedBitmap.recycle();
             }
-            cachedPhoto = null;
             cachedBitmap = null;
             mHandler.removeCallbacks(mDrawWallpaper);
             super.onDestroy();
@@ -232,9 +170,8 @@ public class FlickrLiveWallpaper extends WallpaperService {
                     errorShown = false;
                     mHandler.post(mDrawWallpaper);
                 } else {
-                    final String url = cachedPhoto.getFullFlickrUrl();
-                    Log.i(TAG, "Browsing to image=[" + url + "]");
-                    intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    Log.i(TAG, "Browsing to image=[" + imgUrl + "]");
+                    intent = new Intent(Intent.ACTION_VIEW, Uri.parse(imgUrl));
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     startActivity(intent);
                 }
@@ -248,123 +185,22 @@ public class FlickrLiveWallpaper extends WallpaperService {
             if (cachedBitmap != null) {
                 cachedBitmap.recycle();
             }
-            // List<Photo> list = getPhotosFromExactLocation(location);
-            List<Photo> photos = getPhotosFromApproxLocation(placeName, location);
-            cachedPhoto = choosePhoto(photos);
-
-            if (cachedPhoto != null) {
-                cachedBitmap = retrievePhoto(cachedPhoto);
-            }
-        }
-
-        /*
-         * Using the GeoNames API establish an approximate location
-         * @return Pair<Location, String>(Location, placeName)
-         */
-        private Pair<Location, String> obtainLocation() throws ConnectException {
-            Log.d(TAG, "Requesting photo details based on approximate location");
-            final Location location = getRecentLocation();
-            return new Pair<Location, String>(location, geoNamesAPI.getNearestPlaceName(df.format(location.getLatitude()), df.format(location.getLongitude()),httpClient));
-        }
-
-        /*
-         * Using existing details of a photos specifications obtained from the
-         * Flickr API, request the binary stream from a HTTP connection
-         */
-        private Bitmap retrievePhoto(Photo photo) throws IllegalStateException {
-            URL photoUrl = null;
             final boolean FRAMED = mPrefs.getString(PREF_DISPLAY_TYPE, PREF_DISPLAY_TYPE_FRAME)
                     .equals(PREF_DISPLAY_TYPE_FRAME);
 
-            try {
-                if (FRAMED) {
-                    photoUrl = new URL(photo.getUrl());
-                } else {
-                    Log.i(TAG, "Image is not framed so it will be a large download");
-                    photoUrl = new URL(photo.getUrl(Photo.ORIGINAL_IMG_URL));
-                }
+            final Pair<Bitmap, String> flickrResult = flickrApi.retrievePhoto(FRAMED, location,
+                    placeName);
 
-                Log.d(TAG, "Requesting static image from Flickr=[" + photoUrl + "]");
+            cachedBitmap = flickrResult.first;
+            imgUrl = flickrResult.second;
 
-            } catch (MalformedURLException error) {
-                error.printStackTrace();
-            }
-
-            Bitmap bitmap = null;
-            int retries = 0;
-            do {
-                if (retries > 0) {
-                    Log.e(TAG, "Couldn't retrieve Photo retrying: " + retries);
-                }
-                bitmap = retrieveBitmap(photoUrl);
-                retries++;
-            } while (bitmap == null && retries < 3);
-
-            if (bitmap == null) {
+            if (cachedBitmap == null) {
                 Log.e(TAG, "I'm not sure what went wrong but image could not be retrieved");
                 throw new IllegalStateException(
                         "Whoops! We had problems retrieving an image. Please try again.");
             } else {
-                bitmap = scaleImage(bitmap, displayWidth, displayHeight);
+                cachedBitmap = scaleImage(cachedBitmap, displayWidth, displayHeight);
             }
-
-            return bitmap;
-        }
-
-        private Bitmap retrieveBitmap(URL photoUrl) {
-            Bitmap bitmap = null;
-            HttpResponse response = getHTTPResponse(photoUrl);
-            
-            try {
-                InputStream input = response.getEntity().getContent();
-                bitmap = BitmapFactory.decodeStream(input);
-            } catch (IOException e) {
-                Log.e(TAG, "Could not retrieve bitmap from resulting httpResponse", e);
-            }
-            return bitmap;
-        }
-
-        private HttpResponse getHTTPResponse(URL photoUrl) {
-            HttpGet request = null;
-            HttpResponse response = null;
-
-            try {
-                request = new HttpGet(photoUrl.toURI());
-            } catch (URISyntaxException e) {
-                Log.e(TAG, "Could not create GetRequest: " + e.getMessage(), e);
-            }
-
-//          /*
-//          * HACK: Related to Android #Issue 6850 HttpURLConnection has
-//          * provided mixed reliability in Android and so looping in this
-//          * manor ensures a good connection if it is available. An
-//          * alternative is setting System.setProperty("http.keepAlive",
-//          * "false"); but I did not see results from this.
-//          */
-            System.setProperty("http.keepAlive", "false");
-            try {
-                response = httpClient.execute(request);
-            } catch (ClientProtocolException e) {
-                Log.e(TAG, "Client Protocol exception: " + e.getMessage(), e);
-            } catch (IOException e) {
-                Log.e(TAG, "IOException exception: " + e.getMessage(), e);
-            }
-            
-            if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-                Log.i(TAG, "Response code:[" + HttpStatus.SC_OK + "] Msg:["
-                        + response.getStatusLine().getReasonPhrase() + "] Type:["
-                        + response.getEntity().getContentType() + "] length:["
-                        + response.getEntity().getContentLength() + "]");
-                
-//                List<Header> li = Arrays.asList(response.getAllHeaders());
-//                for(Header head : li){
-//                    Log.i(TAG, "Header: " + head.getName() + " values: " + head.getValue());
-//                }
-//                
-            } else {
-                Log.e(TAG, "Unsuccessful Connection response: " + response.getStatusLine().getStatusCode());
-            }
-            return response;
         }
 
         private void drawPortraitFramedImage() {
@@ -375,14 +211,15 @@ public class FlickrLiveWallpaper extends WallpaperService {
                 if (c != null && cachedBitmap != null) {
                     Log.i(TAG, "Drawing a Framed Portrait image");
                     c.drawPaint(bgPaint);
-                    frame = BitmapFactory.decodeResource(getResources(), R.drawable.bg_frame_portrait);
+                    frame = BitmapFactory.decodeResource(getResources(),
+                            R.drawable.bg_frame_portrait);
                     c.drawBitmap(frame, PORTRAIT_FRAME_LEFT_MARGIN, PORTRAIT_FRAME_TOP_MARGIN,
                             new Paint());
                     c.drawBitmap(cachedBitmap, PORTRAIT_IMG_LEFT_MARGIN, PORTRAIT_IMG_TOP_MARGIN,
                             txtPaint);
                 }
             } finally {
-                if (c != null){
+                if (c != null) {
                     holder.unlockCanvasAndPost(c);
                 }
             }
@@ -397,14 +234,15 @@ public class FlickrLiveWallpaper extends WallpaperService {
                     Log.i(TAG, "Drawing a Framed Landscape image");
 
                     c.drawPaint(bgPaint);
-                    frame = BitmapFactory.decodeResource(getResources(), R.drawable.bg_frame_landscape);
+                    frame = BitmapFactory.decodeResource(getResources(),
+                            R.drawable.bg_frame_landscape);
                     c.drawBitmap(frame, LANDSCAPE_FRAME_LEFT_MARGIN, LANDSCAPE_FRAME_TOP_MARGIN,
                             new Paint());
                     c.drawBitmap(cachedBitmap, LANDSCAPE_IMG_LEFT_MARGIN, LANDSCAPE_IMG_TOP_MARGIN,
                             txtPaint);
                 }
             } finally {
-                if (c != null){
+                if (c != null) {
                     holder.unlockCanvasAndPost(c);
                 }
             }
@@ -483,13 +321,15 @@ public class FlickrLiveWallpaper extends WallpaperService {
             try {
                 c = holder.lockCanvas();
                 c.drawPaint(bgPaint);
-                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(), R.drawable.ic_logo_flickr);
+                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(),
+                        R.drawable.ic_logo_flickr);
                 if (c != null) {
-                    c.drawBitmap(decodeResource, (x - decodeResource.getWidth() * 0.5f), y,                      txtPaint);
+                    c.drawBitmap(decodeResource, (x - decodeResource.getWidth() * 0.5f), y,
+                            txtPaint);
                     c.drawText("Finding your location", x, y + 108, txtPaint);
                 }
             } finally {
-                if (c != null){
+                if (c != null) {
                     holder.unlockCanvasAndPost(c);
                 }
             }
@@ -510,7 +350,8 @@ public class FlickrLiveWallpaper extends WallpaperService {
             try {
                 c = holder.lockCanvas();
                 c.drawPaint(bgPaint);
-                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(), R.drawable.ic_logo_flickr);
+                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(),
+                        R.drawable.ic_logo_flickr);
                 if (c != null) {
                     c.drawBitmap(decodeResource, (x - decodeResource.getWidth() * 0.5f), y,
                             txtPaint);
@@ -519,7 +360,7 @@ public class FlickrLiveWallpaper extends WallpaperService {
                             "Looking for images around " + placeName);
                 }
             } finally {
-                if (c != null){
+                if (c != null) {
                     holder.unlockCanvasAndPost(c);
                 }
             }
@@ -547,7 +388,7 @@ public class FlickrLiveWallpaper extends WallpaperService {
                             txtPaint);
                 }
             } finally {
-                if (c != null){
+                if (c != null) {
                     holder.unlockCanvasAndPost(c);
                 }
             }
@@ -562,7 +403,6 @@ public class FlickrLiveWallpaper extends WallpaperService {
             float x = displayMiddleX;
             float y = 180;
             errorShown = true;
-            cachedPhoto = null;
             if (cachedBitmap != null) {
                 cachedBitmap.recycle();
             }
@@ -572,8 +412,10 @@ public class FlickrLiveWallpaper extends WallpaperService {
             try {
                 c = holder.lockCanvas();
                 c.drawPaint(bgPaint);
-                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(),R.drawable.ic_smile_sad_48);
-                final Bitmap refreshIcon = BitmapFactory.decodeResource(getResources(), R.drawable.ic_refresh_48);
+                final Bitmap decodeResource = BitmapFactory.decodeResource(getResources(),
+                        R.drawable.ic_smile_sad_48);
+                final Bitmap refreshIcon = BitmapFactory.decodeResource(getResources(),
+                        R.drawable.ic_refresh_48);
                 if (c != null) {
 
                     c.drawBitmap(decodeResource, (x - decodeResource.getWidth() * 0.5f), y,
@@ -582,7 +424,7 @@ public class FlickrLiveWallpaper extends WallpaperService {
                     c.drawBitmap(refreshIcon, (x - refreshIcon.getWidth() * 0.5f), 550, txtPaint);
                 }
             } finally {
-                if (c != null){
+                if (c != null) {
                     holder.unlockCanvasAndPost(c);
                 }
             }
@@ -664,8 +506,8 @@ public class FlickrLiveWallpaper extends WallpaperService {
         }
 
         private Location getRecentLocation() {
-            final LocationManager locManager = (LocationManager)FlickrLiveWallpaper.this.getBaseContext()
-                    .getSystemService(Context.LOCATION_SERVICE);
+            final LocationManager locManager = (LocationManager)FlickrLiveWallpaper.this
+                    .getBaseContext().getSystemService(Context.LOCATION_SERVICE);
             Location location = null;
             for (String provider : locManager.getProviders(true)) {
                 location = locManager.getLastKnownLocation(provider);
@@ -674,125 +516,6 @@ public class FlickrLiveWallpaper extends WallpaperService {
                 }
             }
             return location;
-        }
-
-        /*
-         * Chosen an image from within a list of suitable photo specs.
-         */
-        private Photo choosePhoto(List<Photo> photos) {
-            Log.v(TAG, "Choosing a photo from amoungst those with URLs");
-
-            for (int i = 0; i < photos.size(); i++) {
-                if (photos.get(i).origResImg_url == null || photos.get(i).medResImg_url == null
-                        || photos.get(i).smallResImg_url == null) {
-                    photos.remove(i);
-                }
-            }
-            if (photos.size() > 1) {
-                cachedPhoto = photos.get(randomWheel.nextInt(photos.size() - 1));
-                return cachedPhoto;
-            }
-            return photos.get(0);
-        }
-
-        /*
-         * Establish current place name via the GeoName API Query Use place name
-         * to establish if photos are available as a tag on Flickr Requery if
-         * photos can be divided into pages (to help randomness of results)
-         */
-        private List<Photo> getPhotosFromApproxLocation(String placeNameTag, Location location) {
-
-            // Add random to ensure varying results
-            photoSearch.with("accuracy", "11");
-            photoSearch.with("tags", placeNameTag);
-            photoSearch.with("sort", "interestingness-desc");
-            photoSearch.with("media", "photos");
-            photoSearch.with("extras", "url_s,url_m,original_format,path_alias,url_sq,url_t");
-            photoSearch.with("per_page", "50");
-
-            List<Photo> list = photoSearch.fetchStructuredDataList();
-
-            if (list.size() > 1) {
-                int square = (int)Math.sqrt(list.size());
-                photoSearch.with("per_page", "" + square);
-                photoSearch.with("page", "" + randomWheel.nextInt(square - 1));
-                list = photoSearch.fetchStructuredDataList();
-            }
-
-            return list;
-        }
-
-        /*
-         * Return Flickr photos based on the exact user's location
-         */
-        private List<Photo> getPhotosFromExactLocation(Location location) {
-            Log.d(TAG, "Requesting photo details based on exact location");
-            final Flickr<Photo> photoSearch = new PhotoSearch();
-
-            double latitude = location.getLatitude();
-            double longitude = location.getLongitude();
-
-            // Random no. between 0.1 > 0.0099
-            double d = randomWheel.nextDouble();
-            d = Double.valueOf(df.format((d * (0.1 - 0.0099))));
-
-            Log.i(TAG, "Original Longitude=[" + longitude + "] latitude=[" + latitude + "]");
-            Log.i(TAG, "Ammended Longitude=[" + (df.format(longitude + d)) + "] latitude=["
-                    + (df.format(latitude + d)) + "]");
-            // Add random to ensure varying results
-
-            photoSearch.with("lat", "" + df.format(latitude + d));
-            photoSearch.with("lon", "" + df.format(longitude + d));
-            photoSearch.with("accuracy", "1");
-            photoSearch.with("tags", getPeriodOfDay(new GregorianCalendar()
-                    .get(Calendar.HOUR_OF_DAY)));
-            photoSearch.with("sort", "interestingness-desc");
-            photoSearch.with("media", "photos");
-            photoSearch.with("extras", "url_m");
-            photoSearch.with("per_page", "1");
-            // f.with("page", ""+ randomWheel.nextInt(5));
-            List<Photo> list = photoSearch.fetchStructuredDataList();
-
-            if (list.size() < 1) {
-                photoSearch.remove("accuracy", "16");
-                photoSearch.with("accuracy", "11");
-            }
-
-            for (int i = 0; i < list.size(); i++) {
-                Log.i(TAG, "Photo in list= " + list.get(i).toString());
-            }
-
-            return list;
-        }
-
-        /**
-         * Returns a human readable tag which will be used with the search
-         * query.
-         * 
-         * @param 24h clock format
-         * @return Period of Day
-         */
-        private String getPeriodOfDay(int time) {
-            if ((time > 22 && time <= 24) || (time >= 0 && time <= 5)) {
-                return "night";
-            }
-            if (time > 5 && time <= 7) {
-                return "dawn";
-            }
-            if (time > 7 && time <= 11) {
-                return "morning";
-            }
-            if (time > 11 && time <= 15) {
-                return "noon";
-            }
-            if (time > 15 && time <= 19) {
-                return "afternoon";
-            }
-            if (time > 19 && time <= 22) {
-                return "evening";
-            }
-            // should not be here but just in case as it s getting late
-            return "city";
         }
 
         /*
@@ -811,7 +534,7 @@ public class FlickrLiveWallpaper extends WallpaperService {
                         // loadMockImages();
 
                         try {
-                            location = obtainLocation();
+                            location = geoNamesAPI.obtainLocation(getRecentLocation());
                         } catch (ConnectException e) {
                             location = null;
                             drawErrorNotification("Could not connect to the internet to find your location");
@@ -888,31 +611,25 @@ public class FlickrLiveWallpaper extends WallpaperService {
 
         private int displayHeight;
 
-        private Photo cachedPhoto = null;
-
         private long lastSync = 0;
 
         private long cachedImgTopMargin = 0;
-
-        private final Random randomWheel = new Random();
-
-        private DecimalFormat df = new DecimalFormat("#.######");
 
         private boolean currentlyVisibile = false;
 
         private Paint txtPaint;
 
-        private GeoNamesAPI geoNamesAPI;
+        private GeoNamesAPI geoNamesAPI = new GeoNamesAPI();
 
         private float displayMiddleX;
-
-        private final PhotoSearch photoSearch = new PhotoSearch();
 
         private Pair<Location, String> location;
 
         private Paint bgPaint;
 
         private Bitmap frame;
+
+        private final FlickrApi flickrApi = new FlickrApi();
 
         private boolean errorShown = false;
 
@@ -931,8 +648,6 @@ public class FlickrLiveWallpaper extends WallpaperService {
         private static final int PORTRAIT_FRAME_TOP_MARGIN = 70;
 
         private static final int PORTRAIT_FRAME_LEFT_MARGIN = 47;
-
-        private static final int CONNECTION_TIMEOUT = 10 * 1000;
 
     }
 
